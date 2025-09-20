@@ -1,0 +1,10 @@
+module range {
+    param start
+    param step_size
+
+    output start + step * step_size
+}
+
+// This module generates a range of values starting from `start` and
+// incrementing by `step_size` each step. The output follows the formula:
+// output = start + (current_step * step_size)

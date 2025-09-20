@@ -1,0 +1,135 @@
+# Modular Math Language Specification
+
+## Overview
+A domain-specific language for modular computational systems based on block diagrams. The language operates on scalar signals in discrete time steps with a global step counter as the main independent variable.
+
+## Core Concepts
+
+### Execution Model
+- **Step-based execution**: Each computation step increments a global step counter (`step`)
+- **Discrete time**: All computations happen at discrete time steps
+- **No conditionals**: Clean computational model without branching logic
+- **Signal-based**: All data flows through named signals
+
+### Variables and Scope
+- **Signals**: Variables calculated every step, can be saved to output
+- **Parameters**: Design-time constants for module initialization
+- **Global access**: All signals accessible via `instance_name.signal_name`
+- **Step counter**: Built-in `step` variable available to all modules
+
+## Basic Blocks
+
+### Arithmetic Operations
+```
+add: out = in1 + in2
+mul: out = in1 * in2
+sub: out = in1 - in2
+div: out = in1 / in2
+```
+
+### Memory Block
+```
+mem(init_value, input_signal)
+```
+- Two operations per step:
+  1. Copy previous (or init) value to current output
+  2. Store input signal for next step
+- Required for any feedback loops
+- Example: `b = mem(0, a)` creates one-step delay
+
+## Module Definition
+
+### Basic Structure
+```
+module module_name {
+    input input_name
+    param parameter_name
+
+    signal_name = expression
+
+    output signal_name
+}
+```
+
+### Components
+- **input**: Design-time signal inputs that must be provided
+- **param**: Design-time constants for initialization
+- **expressions**: Signal calculations using basic blocks and operations
+- **output**: Named outputs from the module
+
+### Module Instantiation
+```
+instance_name = module_name(param1=value1, param2=value2)
+```
+
+## Signal Operations
+
+### Arithmetic Expressions
+- Basic operations: `+`, `-`, `*`, `/`
+- Parentheses for precedence: `a = (b + c) * d`
+- Step-based expressions: `time = step * dt`
+
+### Signal Access
+- Local signals: `signal_name`
+- Remote signals: `instance_name.signal_name`
+- Step counter: `step`
+
+## Execution Control
+
+### Stopping Conditions
+- Default: `step > 1000`
+- Custom conditions can be specified in runtime configuration
+- No explicit loops or conditionals in module code
+
+### Output Management
+- Module outputs are not automatically saved
+- Specific signals marked for saving appear in final output table
+- Output table indexed by step number
+
+## Language Rules
+
+### Loop Constraints
+- Any feedback loop must contain at least one `mem` block
+- Loops without memory blocks are compilation errors
+
+### Module Composition
+- Modules can contain basic blocks and instances of other modules
+- Multiple time-dependent modules compile to single system of basic blocks
+- Runtime scripts ignored when modules are imported
+
+### Data Types
+- Scalars only (no arrays or vectors)
+- No trigonometric or advanced mathematical functions (for now)
+
+## Example Module
+```
+module integrator {
+    input signal
+    param dt
+    param init_value
+
+    sum = mem(init_value, sum + signal * dt)
+
+    output sum
+}
+```
+
+## Runtime Configuration
+```
+execution {
+    max_steps: 1000
+    save: [signal1, instance.signal2, step]
+    plot: [output_signal]
+}
+```
+
+## Error Conditions
+- Feedback loops without memory blocks
+- Undefined signal references
+- Circular dependencies without proper delay elements
+- Missing required inputs or parameters
+
+## Examples
+See the `examples/` folder for module examples including:
+- `const.txt`: Simple constant value module
+- `range.txt`: Range generator module

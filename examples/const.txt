@@ -1,0 +1,9 @@
+module const {
+    param value
+
+    output value
+}
+
+// This module returns a constant value that is set at initialization time.
+// The parameter `value` becomes the output signal directly, providing a
+// simple way to inject constant values into a system.

@@ -1,0 +1,68 @@
+---- Design document ----
+
+Modular math languange and solver
+
+The main unit in the language is a module.
+A module describes a computational or a block diagram of  a system of equations. Similar to block diagrams in analog computing or control theory (but mainly in the time domain). It is not a general programming language.
+
+Basic blocks are built in, and all the modules are composed from basic blocks and instances of imported modules.
+
+Basic blocks:
+add: in1 + in2
+mul: in1 * in2
+sub: in1 - in2
+div: in1 / in2
+mem: init p1,
+     step 0, in1[0]; out[0]=p1
+     step n, in1[n]; out[n]=in1[n-1]
+
+Modules and module blocks
+a module is composed of basic blocks and instances of imported modules.
+
+Runtime script
+Runtime script defines a stopping condition of the module. By default, this is steps > 1000, but could be other conditions. It also contains values of the global variables and the names of variables that will be saved or plotted.
+
+A module file may contain a runtime script or not. When a module is imported into another module, the runtime script of the imported module is ignored.
+
+connection blocks
+a module can define named inputs that need to be provided at design time. Also, using the keyword output defines the name of the output varible. In case of multiple outputs, they can be accessed by name. 
+input block a signal inputs
+param block is used when initializing only
+
+Examples
+
+module abc {
+	input a
+	input b
+	param c
+	d = a + b * c
+	output d
+}
+
+Clarifications:
+Execution model: the main independent variable available to all modules is the program step counter, may be called step or pc or i or similar. There could be derrived variables like time, defined as step*dt, or some variable x could be step*dx.
+Runtime script: 
+i'm not sure if I want to include the runtime acript with the modules or not. I need a way to tell the program when to stop the execution, and I don't want the user to write a while loop. Also, I think I don't want conditionals in the base language. 
+Variable managment: module outputs are not necessarily saved to the final output table. they may be saved during one step and used in calculations but not copied to the final table. variables to be saved or ploted will appear in the final table. the index of that table are program stepsv. Global variables may be constant value parameters. in principle, all signals are global and accessible through: node_instance_name.var_name.
+
+Example of mem:
+a = steps*0.1
+b = mem(0, a)
+
+# b value will be a single step delayed from a
+All basic blocks have one operation per step except for the mem block - it has two. one is copying the previous (or init) value to current value and the second is pulling the next value from thw input signal and memorizing it.
+
+A loop needs to have at least one mem block, otherwise it is an error.
+
+if there are multiple time-depended modules, they all need to be compiled to a single system of basic blocks.
+
+Debugging and monitoring may be done using plots and tables.
+
+param is a design-time varible used to initialize some values in the module (a mem value?). A signal is a variable calculated every step anew. Can be saved.
+
+module instances:
+my_abc = abc(c=5)
+
+the dsl only uses scalars. 
+
+for now, no trig functions,etc

@@ -1,0 +1,11 @@
+# Euler Integrator
+
+param init
+param dt
+signal dx
+
+m = mem(init)
+
+dxdt = dx * dt
+
+

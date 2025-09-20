@@ -1,0 +1,19 @@
+import range
+
+module time_module {
+    param start
+    param dt
+    param stop
+
+    // Create time signal using imported range module
+    timer = range(start=start, step_size=dt)
+
+    output timer
+}
+
+// Runtime configuration with stop condition
+execution {
+    max_steps: 10000
+    stop_when: timer >= stop
+    save: [timer, step]
+}

@@ -1,0 +1,12 @@
+module euler_integrator {
+    input signal
+    param dt
+    param initial_value
+
+    // Euler integration: integral = previous_integral + signal * dt
+
+    integral = mem(initial_value, integral + signal * dt)
+   
+
+    output integral
+}
