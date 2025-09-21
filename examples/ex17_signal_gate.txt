@@ -1,0 +1,37 @@
+import range
+
+module signal_gate {
+    input signal
+    input control // 0 or 1
+
+    // The output is the signal multiplied by the control signal.
+    // If control is 1, output = signal.
+    // If control is 0, output = 0.
+    gated_signal = signal * control
+
+    output gated_signal
+}
+
+// This example demonstrates a signal gate.
+// A range module provides the input signal.
+// A pulse generator (from the previous example) could provide the control,
+// but for simplicity, we'll create a simple control signal here that is
+// 1 for the first 5 steps, and 0 after.
+
+module gate_example {
+    // Signal is a ramp from 0 to 10
+    input_signal = range(start=0, step_size=1, stop=10)
+
+    // Control is 1 if $step < 5, else 0
+    control_signal = lt($step, 5)
+
+    gated = signal_gate(signal=input_signal, control=control_signal)
+
+    output gated
+}
+
+
+execution {
+    max_steps: 10
+    save: [gated, input_signal, control_signal]
+}

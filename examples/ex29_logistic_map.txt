@@ -1,0 +1,22 @@
+
+module logistic_map {
+    param r = 3.5 // The 'r' parameter, can lead to chaotic behavior
+    param initial_x = 0.5
+
+    // x_next = r * x * (1 - x)
+    x = mem(initial_x, x_next)
+    x_next = r * x * (1 - x)
+
+    output x
+}
+
+module logistic_map_example {
+    // For r between 3.57 and 4, the system exhibits chaotic behavior.
+    logistic_out = logistic_map(r=3.7, initial_x=0.2)
+    output logistic_out
+}
+
+execution {
+    max_steps: 200
+    save: [logistic_out]
+}

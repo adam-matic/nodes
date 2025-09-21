@@ -1,0 +1,17 @@
+module pulse_generator {
+    param pulse_time = 5
+
+    // Use the `eq` block to check if the current step is the pulse_time.
+    // The output will be 1 only at that step, otherwise 0.
+    pulse = eq($step, pulse_time)
+
+    output pulse
+}
+
+// This example demonstrates how to generate a single pulse at a specific
+// time step.
+
+execution {
+    max_steps: 10
+    save: [pulse, $step]
+}

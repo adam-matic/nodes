@@ -1,10 +1,20 @@
 module range {
     param start
     param step_size
+    param stop
 
-    output start + step * step_size
+    step_offset = $step * step_size
+    current_value = start + step_offset
+
+    // Stop when current value reaches or exceeds stop parameter
+    should_stop = gte(current_value, stop)
+    HALT(should_stop)
+
+    output current_value
 }
 
 // This module generates a range of values starting from `start` and
 // incrementing by `step_size` each step. The output follows the formula:
-// output = start + (current_step * step_size)
+// output = start + ($step * step_size)
+// The module will halt execution when the current value reaches or exceeds
+// the `stop` parameter using the HALT block.

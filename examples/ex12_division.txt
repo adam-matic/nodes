@@ -1,0 +1,18 @@
+import const
+
+module division_example {
+    numerator = const(value=10)
+    denominator = const(value=2)
+
+    result = numerator / denominator
+
+    output result
+}
+
+// This example demonstrates a simple division.
+// The output 'result' will be the constant value 5.
+
+execution {
+    max_steps: 10
+    save: [result]
+}

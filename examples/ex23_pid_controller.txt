@@ -1,0 +1,51 @@
+
+import euler_integrator
+import differentiator
+
+module pid_controller {
+    input setpoint
+    input process_variable
+
+    param kp = 1.0  // Proportional gain
+    param ki = 0.1  // Integral gain
+    param kd = 0.01 // Derivative gain
+    param dt = 0.1
+
+    // Error term
+    error = setpoint - process_variable
+
+    // Proportional component
+    p_term = kp * error
+
+    // Integral component
+    integrated_error = euler_integrator(signal=error, dt=dt, initial_value=0)
+    i_term = ki * integrated_error
+
+    // Derivative component
+    error_derivative = differentiator(signal=error, dt=dt)
+    d_term = kd * error_derivative
+
+    // PID output
+    output = p_term + i_term + d_term
+
+    output output
+}
+
+// Example of using the PID controller to control a simple first-order system
+module pid_example {
+    param setpoint = 10
+
+    // The system we are controlling: a simple integrator (a plant)
+    plant_output = euler_integrator(signal=control_signal, dt=0.1, initial_value=0)
+
+    // The PID controller
+    control_signal = pid_controller(setpoint=setpoint, process_variable=plant_output, kp=2, ki=0.5, kd=0.1)
+
+    output plant_output
+    output control_signal
+}
+
+execution {
+    max_steps: 200
+    save: [plant_output, control_signal]
+}

@@ -1,0 +1,20 @@
+module accumulator {
+    param initial_value = 0
+    param value_to_add = 10
+
+    // The next value is the current value plus a constant.
+    next_value = current_value + value_to_add
+
+    // The `mem` block creates the feedback loop.
+    current_value = mem(initial_value, next_value)
+
+    output current_value
+}
+
+// This example demonstrates a simple feedback loop that accumulates
+// a value over time. It's a basic form of an integrator.
+
+execution {
+    max_steps: 10
+    save: [current_value]
+}

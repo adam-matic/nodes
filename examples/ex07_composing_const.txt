@@ -1,0 +1,21 @@
+import const
+
+module compose_consts {
+    // Instantiate two constant modules.
+    const1 = const(value=7)
+    const2 = const(value=6)
+
+    // Multiply the outputs of the two instances.
+    product = const1 * const2
+
+    output product
+}
+
+// This example demonstrates composing modules. It creates two
+// instances of the `const` module and multiplies their values.
+// The output will be the constant value 42.
+
+execution {
+    max_steps: 1
+    save: [product]
+}

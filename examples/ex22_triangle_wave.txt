@@ -1,0 +1,43 @@
+
+import euler_integrator
+
+module triangle_wave_generator {
+    param period = 20
+    param amplitude = 5
+    param dt = 0.1
+
+    // This is more complex. We need an integrator and a way to flip the sign
+    // of the integrated signal when it reaches the amplitude.
+
+    // Let's use a state to represent the direction of the ramp (up or down)
+    // state = 1 for up, state = -1 for down
+
+    // The signal to integrate is the state, scaled to control the slope.
+    slope = (2 * amplitude) / (period * dt / 2) // This is how much to change per step
+    signal_to_integrate = state * slope
+
+    // Integrate the signal
+    integrated = euler_integrator(signal=signal_to_integrate, dt=dt, initial_value=0)
+
+    // Check if we need to flip the state
+    is_over_positive_amp = gte(integrated, amplitude)
+    is_under_negative_amp = lte(integrated, -amplitude)
+    should_flip = is_over_positive_amp + is_under_negative_amp
+
+    // Flip the state if needed
+    flipped_state = -state
+    next_state = (flipped_state * should_flip) + (state * (1 - should_flip))
+    state = mem(1, next_state)
+
+    output integrated
+}
+
+module triangle_wave_example {
+    triangle_out = triangle_wave_generator(period=50, amplitude=5)
+    output triangle_out
+}
+
+execution {
+    max_steps: 200
+    save: [triangle_out]
+}

@@ -1,0 +1,17 @@
+import const
+
+module subtraction_example {
+    a = const(value=100)
+    b = const(value=42)
+    result = a - b
+
+    output result
+}
+
+// This example demonstrates a simple subtraction.
+// The output 'result' will be the constant value 58.
+
+execution {
+    max_steps: 10
+    save: [result]
+}

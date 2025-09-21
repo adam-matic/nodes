@@ -1,0 +1,21 @@
+module halt_at_step {
+    param stop_step = 7
+
+    // The `eq` block returns 1 if $step == stop_step, 0 otherwise.
+    should_halt = eq($step, stop_step)
+
+    // The HALT block stops the simulation when its input is non-zero.
+    HALT(should_halt)
+
+    // The output is just the current step number.
+    output $step
+}
+
+// This example demonstrates how to use the HALT block to stop
+// a simulation from within a module. The simulation will stop
+// at step 7.
+
+execution {
+    max_steps: 100 // This will be overridden by the HALT block
+    save: [$step]
+}

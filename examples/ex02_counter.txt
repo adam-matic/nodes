@@ -1,0 +1,18 @@
+module counter {
+    // The counter's next value is its previous value plus one.
+    next_value = current_value + 1
+
+    // The `mem` block provides the one-step delay needed for the feedback loop.
+    // It starts at 0.
+    current_value = mem(0, next_value)
+
+    output current_value
+}
+
+// This module implements a simple counter that starts at 0 and
+// increments by 1 at each step.
+
+execution {
+    max_steps: 10
+    save: [current_value]
+}

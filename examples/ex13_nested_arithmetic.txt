@@ -1,0 +1,21 @@
+import const
+
+module nested_arithmetic_example {
+    a = const(value=2)
+    b = const(value=3)
+    c = const(value=4)
+
+    // Operations are executed based on standard arithmetic precedence.
+    // result = (2 + 3) * 4 = 20
+    result = (a + b) * c
+
+    output result
+}
+
+// This example demonstrates nested arithmetic operations.
+// The output 'result' will be the constant value 20.
+
+execution {
+    max_steps: 10
+    save: [result]
+}

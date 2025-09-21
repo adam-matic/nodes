@@ -1,0 +1,27 @@
+module min {
+    input a
+    input b
+
+    is_a_less = lt(a, b)
+    output = (a * is_a_less) + (b * (1-is_a_less))
+}
+
+module ramp_generator {
+    param ramp_end_value = 5
+
+    // The ramp is the step counter
+    ramp = $step
+
+    // The output is the minimum of the ramp and the end value.
+    ramped = min(a=ramp, b=ramp_end_value)
+    
+    output ramped
+}
+
+// This example demonstrates a ramp generator that stops at a specific
+// value by taking the minimum of the current step and the end value.
+
+execution {
+    max_steps: 10
+    save: [ramped]
+}

@@ -1,0 +1,21 @@
+
+module exponential_decay {
+    param initial_value = 100
+    param decay_rate = 0.95 // Per step
+
+    // output = prev_output * decay_rate
+    next_value = current_value * decay_rate
+    current_value = mem(initial_value, next_value)
+
+    output current_value
+}
+
+module decay_example {
+    decay_out = exponential_decay(initial_value=50, decay_rate=0.9)
+    output decay_out
+}
+
+execution {
+    max_steps: 50
+    save: [decay_out]
+}

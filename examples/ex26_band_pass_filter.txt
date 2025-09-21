@@ -1,0 +1,34 @@
+
+import low_pass_filter
+import high_pass_filter
+
+module band_pass_filter {
+    input signal
+    param low_pass_alpha = 0.2
+    param high_pass_alpha = 0.8
+
+    // Cascade a high-pass and a low-pass filter
+    high_passed = high_pass_filter(signal=signal, alpha=high_pass_alpha)
+    low_passed = low_pass_filter(signal=high_passed, alpha=low_pass_alpha)
+
+    output low_passed
+}
+
+// Example: Apply a band-pass filter to a signal
+module band_pass_example {
+    // A signal that changes frequency
+    is_fast = gte($step, 50)
+    fast_freq = $step * 0.5
+    slow_freq = $step * 0.1
+    input_signal = (is_fast * fast_freq) + ((1 - is_fast) * slow_freq)
+
+    filtered_signal = band_pass_filter(signal=input_signal)
+
+    output input_signal
+    output filtered_signal
+}
+
+execution {
+    max_steps: 100
+    save: [input_signal, filtered_signal]
+}

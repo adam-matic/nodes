@@ -1,0 +1,22 @@
+import euler_integrator
+import const
+
+module integrator_usage {
+    // The signal to be integrated is a constant value of 1.
+    signal_to_integrate = const(value=1)
+
+    // Instantiate the integrator.
+    // dt=0.1, initial_value=0
+    integrated_signal = euler_integrator(signal=signal_to_integrate, dt=0.1, initial_value=0)
+
+    output integrated_signal
+}
+
+// This example demonstrates how to use the `euler_integrator` module.
+// It integrates a constant signal of 1, which should result in a
+// ramp output (a straight line with a positive slope).
+
+execution {
+    max_steps: 10
+    save: [integrated_signal]
+}

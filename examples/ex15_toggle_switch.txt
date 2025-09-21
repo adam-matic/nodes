@@ -1,0 +1,26 @@
+module toggle_switch {
+    param period = 5
+
+    // Internal counter that goes from 0 to period-1 and repeats
+    next_count = count + 1
+    is_reset = gte(next_count, period)
+    count = mem(0, next_count * (1 - is_reset))
+
+    // Toggle the state when the counter resets (i.e., is_reset is 1)
+    // next_state = if is_reset then (1 - state) else state
+    toggled_state = 1 - state
+    
+    // This is a multiplexer
+    next_state = (toggled_state * is_reset) + (state * (1 - is_reset))
+    state = mem(0, next_state)
+
+    output state
+}
+
+// This example demonstrates a toggle switch that flips its state
+// (0 or 1) periodically.
+
+execution {
+    max_steps: 20
+    save: [state, count]
+}

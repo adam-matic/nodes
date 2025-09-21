@@ -1,0 +1,35 @@
+module differentiator {
+    input signal
+    param dt = 0.1
+    param initial_value = 0
+
+    // Get the previous value of the signal.
+    prev_signal = mem(initial_value, signal)
+
+    // Calculate the difference.
+    delta = signal - prev_signal
+
+    // Divide by the time step.
+    derivative = delta / dt
+
+    output derivative
+}
+
+// This module calculates the approximate derivative of an input signal.
+// For this example, we'll feed it the $step value as input.
+// The derivative of $step (which is like 't') should be constant.
+
+module differentiator_example {
+    // The input signal is just the step number.
+    input_signal = $step
+
+    // Differentiate the input signal.
+    differentiated = differentiator(signal=input_signal, dt=1)
+
+    output differentiated
+}
+
+execution {
+    max_steps: 10
+    save: [differentiated]
+}

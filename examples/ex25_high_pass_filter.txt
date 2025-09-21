@@ -1,0 +1,31 @@
+
+module high_pass_filter {
+    input signal
+    param alpha = 0.8 // Cut-off factor. Closer to 1 means higher cut-off freq.
+
+    // y_out = alpha * (y_prev + x_in - x_prev)
+    prev_output = mem(0, output)
+    prev_input = mem(0, signal)
+
+    term = prev_output + signal - prev_input
+    output = alpha * term
+
+    output output
+}
+
+// Example: Apply a high-pass filter to a step function
+// It should output a spike at the step and then decay to 0.
+module high_pass_example {
+    // Create a step function at step 10
+    input_signal = gte($step, 10)
+
+    filtered_signal = high_pass_filter(signal=input_signal, alpha=0.9)
+
+    output input_signal
+    output filtered_signal
+}
+
+execution {
+    max_steps: 50
+    save: [input_signal, filtered_signal]
+}

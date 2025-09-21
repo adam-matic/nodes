@@ -1,0 +1,17 @@
+import const
+
+module addition_example {
+    a = const(value=10)
+    b = const(value=32)
+    result = a + b
+
+    output result
+}
+
+// This example demonstrates basic arithmetic and module composition.
+// The output 'result' will be the constant value 42.
+
+execution {
+    max_steps: 10
+    save: [result]
+}

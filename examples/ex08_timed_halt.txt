@@ -1,0 +1,20 @@
+import range
+
+module timed_halt_example {
+    // The range module will generate a signal that starts at 0,
+    // increments by 1 each step, and halts the simulation when
+    // the value reaches 5.
+    timer = range(start=0, step_size=1, stop=5)
+
+    output timer
+}
+
+// This example shows how a module can internally control the
+// simulation's end. The `range` module itself contains a HALT
+// block, so the simulation will stop when the timer value
+// reaches the `stop` parameter.
+
+execution {
+    max_steps: 1000 // This will be overridden by the HALT in the range module.
+    save: [timer, $step]
+}

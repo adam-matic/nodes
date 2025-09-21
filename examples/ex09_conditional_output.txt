@@ -1,0 +1,28 @@
+module conditional_output {
+    param switch_time = 5
+    param value_before = 10
+    param value_after = 20
+
+    // is_after is 0 before switch_time, and 1 at and after switch_time.
+    is_after = gte($step, switch_time)
+    is_before = 1 - is_after
+
+    // When is_before is 1, this term is value_before. When 0, this term is 0.
+    part1 = is_before * value_before
+    // When is_after is 1, this term is value_after. When 0, this term is 0.
+    part2 = is_after * value_after
+
+    // The result is the sum of the two parts. Only one part is non-zero at a time.
+    result = part1 + part2
+
+    output result
+}
+
+// This example demonstrates how to create a conditional output
+// that switches between two values at a specific time, using only
+// arithmetic and comparison blocks.
+
+execution {
+    max_steps: 10
+    save: [result, $step]
+}

@@ -1,0 +1,16 @@
+module scaled_step {
+    param scale_factor = 0.5
+
+    // The output is the global step counter multiplied by a scaling factor.
+    scaled_output = $step * scale_factor
+
+    output scaled_output
+}
+
+// This example shows how to use the global `$step` variable and
+// a parameter to create a scaled time-like signal.
+
+execution {
+    max_steps: 10
+    save: [scaled_output]
+}

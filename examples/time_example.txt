@@ -6,7 +6,7 @@ module time_module {
     param stop
 
     // Create time signal using imported range module
-    timer = range(start=start, step_size=dt)
+    timer = range(start=start, step_size=dt, stop=stop)
 
     output timer
 }
@@ -15,5 +15,5 @@ module time_module {
 execution {
     max_steps: 10000
     stop_when: timer >= stop
-    save: [timer, step]
+    save: [timer, $step]
 }

@@ -1,0 +1,31 @@
+
+module low_pass_filter {
+    input signal
+    param alpha = 0.1 // Smoothing factor. Closer to 0 means more smoothing.
+
+    // y_out = y_prev + alpha * (x_in - y_prev)
+    // y_out = (1 - alpha) * y_prev + alpha * x_in
+    
+    prev_output = mem(0, output)
+    term1 = (1 - alpha) * prev_output
+    term2 = alpha * signal
+    output = term1 + term2
+
+    output output
+}
+
+// Example: Apply a low-pass filter to a noisy signal (step function)
+module low_pass_example {
+    // Create a step function at step 10
+    input_signal = gte($step, 10)
+
+    filtered_signal = low_pass_filter(signal=input_signal, alpha=0.2)
+
+    output input_signal
+    output filtered_signal
+}
+
+execution {
+    max_steps: 50
+    save: [input_signal, filtered_signal]
+}
