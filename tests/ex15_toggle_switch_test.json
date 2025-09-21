@@ -1,0 +1,12 @@
+{
+  "test_name": "Test toggle switch with period 5",
+  "module_file": "examples/ex15_toggle_switch.txt",
+  "module_name": "toggle_switch",
+  "parameters": {
+    "period": 5
+  },
+  "max_steps": 12,
+  "expected_output": {
+    "state": [0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 0, 0]
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "test_name": "Test comparison of step counter with threshold",
+  "module_file": "examples/ex04_compare_steps.txt",
+  "module_name": "compare_steps",
+  "parameters": {
+    "threshold": 3
+  },
+  "max_steps": 6,
+  "expected_output": {
+    "is_over_threshold": [0, 0, 0, 0, 1, 1]
+  }
+}

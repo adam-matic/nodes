@@ -1,0 +1,12 @@
+{
+  "test_name": "Test const module",
+  "module_file": "examples/const.txt",
+  "module_name": "const",
+  "parameters": {
+    "value": 123
+  },
+  "max_steps": 1,
+  "expected_output": {
+    "value": [123]
+  }
+}

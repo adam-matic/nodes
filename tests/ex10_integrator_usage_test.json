@@ -1,0 +1,10 @@
+{
+  "test_name": "Test Euler integrator with constant input",
+  "module_file": "examples/ex10_integrator_usage.txt",
+  "module_name": "integrator_usage",
+  "parameters": {},
+  "max_steps": 5,
+  "expected_output": {
+    "integrated_signal": [0, 0.1, 0.2, 0.3, 0.4]
+  }
+}

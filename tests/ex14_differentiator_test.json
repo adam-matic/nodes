@@ -1,0 +1,10 @@
+{
+  "test_name": "Test differentiator with step input",
+  "module_file": "examples/ex14_differentiator.txt",
+  "module_name": "differentiator_example",
+  "parameters": {},
+  "max_steps": 5,
+  "expected_output": {
+    "differentiated": [0, 1, 1, 1, 1]
+  }
+}

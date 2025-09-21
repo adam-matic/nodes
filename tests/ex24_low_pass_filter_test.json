@@ -1,0 +1,10 @@
+{
+  "test_name": "Test low-pass filter",
+  "module_file": "examples/ex24_low_pass_filter.txt",
+  "module_name": "low_pass_example",
+  "parameters": {},
+  "max_steps": 15,
+  "expected_output": {
+    "filtered_signal": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.2, 0.36, 0.488, 0.590, 0.672]
+  }
+}

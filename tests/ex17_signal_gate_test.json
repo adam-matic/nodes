@@ -1,0 +1,10 @@
+{
+  "test_name": "Test signal gate",
+  "module_file": "examples/ex17_signal_gate.txt",
+  "module_name": "gate_example",
+  "parameters": {},
+  "max_steps": 8,
+  "expected_output": {
+    "gated": [0, 1, 2, 3, 4, 0, 0, 0]
+  }
+}

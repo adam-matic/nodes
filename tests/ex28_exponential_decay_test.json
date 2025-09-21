@@ -1,0 +1,13 @@
+{
+  "test_name": "Test exponential decay",
+  "module_file": "examples/ex28_exponential_decay.txt",
+  "module_name": "decay_example",
+  "parameters": {
+    "initial_value": 100,
+    "decay_rate": 0.8
+  },
+  "max_steps": 5,
+  "expected_output": {
+    "decay_out": [100, 80, 64, 51.2, 40.96]
+  }
+}

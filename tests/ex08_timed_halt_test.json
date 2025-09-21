@@ -1,0 +1,10 @@
+{
+  "test_name": "Test timed halt using the range module",
+  "module_file": "examples/ex08_timed_halt.txt",
+  "module_name": "timed_halt_example",
+  "parameters": {},
+  "max_steps": 10,
+  "expected_output": {
+    "timer": [0, 1, 2, 3, 4, 5]
+  }
+}

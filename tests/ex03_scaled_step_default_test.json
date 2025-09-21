@@ -1,0 +1,10 @@
+{
+  "test_name": "Test scaled step with default scale factor",
+  "module_file": "examples/ex03_scaled_step.txt",
+  "module_name": "scaled_step",
+  "parameters": {},
+  "max_steps": 5,
+  "expected_output": {
+    "scaled_output": [0, 0.5, 1.0, 1.5, 2.0]
+  }
+}

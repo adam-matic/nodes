@@ -1,0 +1,10 @@
+{
+  "test_name": "Test nested arithmetic operations",
+  "module_file": "examples/ex13_nested_arithmetic.txt",
+  "module_name": "nested_arithmetic_example",
+  "parameters": {},
+  "max_steps": 1,
+  "expected_output": {
+    "result": [20]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "test_name": "Test conditional output switching between two values",
+  "module_file": "examples/ex09_conditional_output.txt",
+  "module_name": "conditional_output",
+  "parameters": {
+    "switch_time": 3,
+    "value_before": 100,
+    "value_after": 200
+  },
+  "max_steps": 6,
+  "expected_output": {
+    "result": [100, 100, 100, 200, 200, 200]
+  }
+}

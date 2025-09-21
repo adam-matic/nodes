@@ -1,0 +1,13 @@
+{
+  "test_name": "Test sawtooth wave generator",
+  "module_file": "examples/ex27_sawtooth_wave.txt",
+  "module_name": "sawtooth_wave_example",
+  "parameters": {
+    "period": 5,
+    "amplitude": 5
+  },
+  "max_steps": 12,
+  "expected_output": {
+    "sawtooth_out": [0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0, 1]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "test_name": "Test counter increments correctly",
+  "module_file": "examples/ex02_counter.txt",
+  "module_name": "counter",
+  "parameters": {},
+  "max_steps": 5,
+  "expected_output": {
+    "current_value": [0, 1, 2, 3, 4]
+  }
+}

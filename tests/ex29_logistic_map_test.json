@@ -1,0 +1,13 @@
+{
+  "test_name": "Test logistic map",
+  "module_file": "examples/ex29_logistic_map.txt",
+  "module_name": "logistic_map_example",
+  "parameters": {
+    "r": 3.7,
+    "initial_x": 0.2
+  },
+  "max_steps": 10,
+  "expected_output": {
+    "logistic_out": [0.2, 0.592, 0.893, 0.352, 0.844, 0.499, 0.926, 0.252, 0.698, 0.780]
+  }
+}

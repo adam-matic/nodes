@@ -1,0 +1,12 @@
+{
+  "test_name": "Test PID controller",
+  "module_file": "examples/ex23_pid_controller.txt",
+  "module_name": "pid_example",
+  "parameters": {
+    "setpoint": 10
+  },
+  "max_steps": 10,
+  "expected_output": {
+    "plant_output": [0.0, 2.0, 4.9, 7.8, 9.8, 10.5, 10.3, 10.1, 10.0, 10.0]
+  }
+}

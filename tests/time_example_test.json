@@ -1,0 +1,14 @@
+{
+  "test_name": "Test time module",
+  "module_file": "examples/time_example.txt",
+  "module_name": "time_module",
+  "parameters": {
+    "start": 0,
+    "dt": 0.5,
+    "stop": 2
+  },
+  "max_steps": 5,
+  "expected_output": {
+    "timer": [0, 0.5, 1.0, 1.5, 2.0]
+  }
+}

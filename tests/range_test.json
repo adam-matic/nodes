@@ -1,0 +1,14 @@
+{
+  "test_name": "Test range module",
+  "module_file": "examples/range.txt",
+  "module_name": "range",
+  "parameters": {
+    "start": 10,
+    "step_size": 2,
+    "stop": 15
+  },
+  "max_steps": 5,
+  "expected_output": {
+    "current_value": [10, 12, 14]
+  }
+}

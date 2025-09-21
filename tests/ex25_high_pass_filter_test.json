@@ -1,0 +1,10 @@
+{
+  "test_name": "Test high-pass filter",
+  "module_file": "examples/ex25_high_pass_filter.txt",
+  "module_name": "high_pass_example",
+  "parameters": {},
+  "max_steps": 15,
+  "expected_output": {
+    "filtered_signal": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.9, 0.09, 0.009, 0.0009, 0.00009]
+  }
+}

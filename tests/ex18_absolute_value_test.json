@@ -1,0 +1,10 @@
+{
+  "test_name": "Test absolute value",
+  "module_file": "examples/ex18_absolute_value.txt",
+  "module_name": "abs_example",
+  "parameters": {},
+  "max_steps": 11,
+  "expected_output": {
+    "abs_output": [5, 4, 3, 2, 1, 0, 1, 2, 3, 4, 5]
+  }
+}
