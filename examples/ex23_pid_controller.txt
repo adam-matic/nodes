@@ -12,21 +12,22 @@ module pid_controller {
     param dt = 0.1
 
     // Error term
-    error = setpoint - process_variable
+    error = sub(setpoint, process_variable)
 
     // Proportional component
-    p_term = kp * error
+    p_term = mult(kp, error)
 
     // Integral component
     integrated_error = euler_integrator(signal=error, dt=dt, initial_value=0)
-    i_term = ki * integrated_error
+    i_term = mult(ki, integrated_error)
 
     // Derivative component
     error_derivative = differentiator(signal=error, dt=dt)
-    d_term = kd * error_derivative
+    d_term = mult(kd, error_derivative)
 
     // PID output
-    output = p_term + i_term + d_term
+    p_plus_i = add(p_term, i_term)
+    output = add(p_plus_i, d_term)
 
     output output
 }

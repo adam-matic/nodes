@@ -2,7 +2,7 @@ module scaled_step {
     param scale_factor = 0.5
 
     // The output is the global step counter multiplied by a scaling factor.
-    scaled_output = $step * scale_factor
+    scaled_output = mult($step, scale_factor)
 
     output scaled_output
 }

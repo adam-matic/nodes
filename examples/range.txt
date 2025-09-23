@@ -3,8 +3,8 @@ module range {
     param step_size
     param stop
 
-    step_offset = $step * step_size
-    current_value = start + step_offset
+    step_offset = mult($step, step_size)
+    current_value = add(start, step_offset)
 
     // Stop when current value reaches or exceeds stop parameter
     should_stop = gte(current_value, stop)

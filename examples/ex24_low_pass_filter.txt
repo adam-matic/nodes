@@ -7,9 +7,10 @@ module low_pass_filter {
     // y_out = (1 - alpha) * y_prev + alpha * x_in
     
     prev_output = mem(0, output)
-    term1 = (1 - alpha) * prev_output
-    term2 = alpha * signal
-    output = term1 + term2
+    one_minus_alpha = sub(1, alpha)
+    term1 = mult(one_minus_alpha, prev_output)
+    term2 = mult(alpha, signal)
+    output = add(term1, term2)
 
     output output
 }

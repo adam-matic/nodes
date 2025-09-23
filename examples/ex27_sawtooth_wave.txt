@@ -4,14 +4,16 @@ module sawtooth_wave_generator {
     param amplitude = 5
 
     // Internal counter that goes from 0 to period-1 and repeats
-    next_count = count + 1
+    next_count = add(count, 1)
     is_reset = gte(next_count, period)
-    count = mem(0, next_count * (1 - is_reset))
+    one_minus_is_reset = sub(1, is_reset)
+    reset_mult = mult(next_count, one_minus_is_reset)
+    count = mem(0, reset_mult)
 
     // The output is the counter value, scaled to the amplitude
     // The slope is amplitude / period
-    slope = amplitude / period
-    wave = count * slope
+    slope = div(amplitude, period)
+    wave = mult(count, slope)
 
     output wave
 }

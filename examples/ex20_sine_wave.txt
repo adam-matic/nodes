@@ -15,11 +15,14 @@ module sine_wave_generator {
     // Integrator 2: integrates acceleration to get velocity (the cosine wave)
 
     // acceleration = -frequency^2 * position
-    acceleration = -(frequency * frequency) * position
+    freq_squared = mult(frequency, frequency)
+    neg_freq_squared = mult(-1, freq_squared)
+    acceleration = mult(neg_freq_squared, position)
 
     // velocity is the integral of acceleration
     // Initial velocity is `amplitude * frequency` to start with a cosine
-    velocity = euler_integrator(signal=acceleration, dt=dt, initial_value=amplitude * frequency)
+    initial_velocity = mult(amplitude, frequency)
+    velocity = euler_integrator(signal=acceleration, dt=dt, initial_value=initial_velocity)
 
     // position is the integral of velocity
     // Initial position is 0 to start with a sine

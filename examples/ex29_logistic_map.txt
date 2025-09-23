@@ -5,7 +5,9 @@ module logistic_map {
 
     // x_next = r * x * (1 - x)
     x = mem(initial_x, x_next)
-    x_next = r * x * (1 - x)
+    one_minus_x = sub(1, x)
+    r_times_x = mult(r, x)
+    x_next = mult(r_times_x, one_minus_x)
 
     output x
 }

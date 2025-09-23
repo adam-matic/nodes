@@ -7,7 +7,8 @@ module nested_arithmetic_example {
 
     // Operations are executed based on standard arithmetic precedence.
     // result = (2 + 3) * 4 = 20
-    result = (a + b) * c
+    a_plus_b = add(a, b)
+    result = mult(a_plus_b, c)
 
     output result
 }

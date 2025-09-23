@@ -4,7 +4,7 @@ module division_example {
     numerator = const(value=10)
     denominator = const(value=2)
 
-    result = numerator / denominator
+    result = div(numerator, denominator)
 
     output result
 }

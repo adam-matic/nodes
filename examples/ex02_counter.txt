@@ -1,6 +1,6 @@
 module counter {
     // The counter's next value is its previous value plus one.
-    next_value = current_value + 1
+    next_value = add(current_value, 1)
 
     // The `mem` block provides the one-step delay needed for the feedback loop.
     // It starts at 0.

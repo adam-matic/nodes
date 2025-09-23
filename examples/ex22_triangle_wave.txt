@@ -13,8 +13,11 @@ module triangle_wave_generator {
     // state = 1 for up, state = -1 for down
 
     // The signal to integrate is the state, scaled to control the slope.
-    slope = (2 * amplitude) / (period * dt / 2) // This is how much to change per step
-    signal_to_integrate = state * slope
+    two_amplitude = mult(2, amplitude)
+    period_dt = mult(period, dt)
+    period_dt_half = div(period_dt, 2)
+    slope = div(two_amplitude, period_dt_half) // This is how much to change per step
+    signal_to_integrate = mult(state, slope)
 
     // Integrate the signal
     integrated = euler_integrator(signal=signal_to_integrate, dt=dt, initial_value=0)
@@ -22,11 +25,14 @@ module triangle_wave_generator {
     // Check if we need to flip the state
     is_over_positive_amp = gte(integrated, amplitude)
     is_under_negative_amp = lte(integrated, -amplitude)
-    should_flip = is_over_positive_amp + is_under_negative_amp
+    should_flip = add(is_over_positive_amp, is_under_negative_amp)
 
     // Flip the state if needed
-    flipped_state = -state
-    next_state = (flipped_state * should_flip) + (state * (1 - should_flip))
+    flipped_state = mult(-1, state)
+    term1 = mult(flipped_state, should_flip)
+    one_minus_should_flip = sub(1, should_flip)
+    term2 = mult(state, one_minus_should_flip)
+    next_state = add(term1, term2)
     state = mem(1, next_state)
 
     output integrated

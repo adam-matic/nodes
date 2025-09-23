@@ -7,7 +7,7 @@ module signal_gate {
     // The output is the signal multiplied by the control signal.
     // If control is 1, output = signal.
     // If control is 0, output = 0.
-    gated_signal = signal * control
+    gated_signal = mult(signal, control)
 
     output gated_signal
 }

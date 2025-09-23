@@ -4,7 +4,7 @@ module exponential_decay {
     param decay_rate = 0.95 // Per step
 
     // output = prev_output * decay_rate
-    next_value = current_value * decay_rate
+    next_value = mult(current_value, decay_rate)
     current_value = mem(initial_value, next_value)
 
     output current_value

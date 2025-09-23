@@ -3,7 +3,7 @@ import const
 module subtraction_example {
     a = const(value=100)
     b = const(value=42)
-    result = a - b
+    result = sub(a, b)
 
     output result
 }

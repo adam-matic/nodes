@@ -7,8 +7,9 @@ module high_pass_filter {
     prev_output = mem(0, output)
     prev_input = mem(0, signal)
 
-    term = prev_output + signal - prev_input
-    output = alpha * term
+    prev_plus_signal = add(prev_output, signal)
+    term = sub(prev_plus_signal, prev_input)
+    output = mult(alpha, term)
 
     output output
 }

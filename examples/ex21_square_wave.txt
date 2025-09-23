@@ -10,7 +10,9 @@ module square_wave_generator {
 
     // Scale and shift the 0-1 signal to be a -amplitude to +amplitude square wave
     // Formula: output = (2 * toggle - 1) * amplitude
-    scaled_wave = (2 * toggle - 1) * amplitude
+    two_toggle = mult(2, toggle)
+    toggle_minus_one = sub(two_toggle, 1)
+    scaled_wave = mult(toggle_minus_one, amplitude)
 
     output scaled_wave
 }

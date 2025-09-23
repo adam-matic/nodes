@@ -18,9 +18,12 @@ module band_pass_filter {
 module band_pass_example {
     // A signal that changes frequency
     is_fast = gte($step, 50)
-    fast_freq = $step * 0.5
-    slow_freq = $step * 0.1
-    input_signal = (is_fast * fast_freq) + ((1 - is_fast) * slow_freq)
+    fast_freq = mult($step, 0.5)
+    slow_freq = mult($step, 0.1)
+    fast_term = mult(is_fast, fast_freq)
+    one_minus_is_fast = sub(1, is_fast)
+    slow_term = mult(one_minus_is_fast, slow_freq)
+    input_signal = add(fast_term, slow_term)
 
     filtered_signal = band_pass_filter(signal=input_signal)
 

@@ -6,7 +6,7 @@ module compose_consts {
     const2 = const(value=6)
 
     // Multiply the outputs of the two instances.
-    product = const1 * const2
+    product = mult(const1, const2)
 
     output product
 }

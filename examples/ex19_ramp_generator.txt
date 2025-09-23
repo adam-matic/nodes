@@ -3,7 +3,10 @@ module min {
     input b
 
     is_a_less = lt(a, b)
-    output = (a * is_a_less) + (b * (1-is_a_less))
+    term1 = mult(a, is_a_less)
+    one_minus_is_a_less = sub(1, is_a_less)
+    term2 = mult(b, one_minus_is_a_less)
+    output = add(term1, term2)
 }
 
 module ramp_generator {

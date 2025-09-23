@@ -3,7 +3,7 @@ import const
 module addition_example {
     a = const(value=10)
     b = const(value=32)
-    result = a + b
+    result = add(a, b)
 
     output result
 }

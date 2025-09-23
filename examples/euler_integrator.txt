@@ -5,8 +5,8 @@ module euler_integrator {
 
     // Euler integration: integral = previous_integral + signal * dt
 
-    signal_dt = signal * dt
-    next_integral = integral + signal_dt
+    signal_dt = mult(signal, dt)
+    next_integral = add(integral, signal_dt)
     integral = mem(initial_value, next_integral)
    
 

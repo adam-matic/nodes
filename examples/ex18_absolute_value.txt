@@ -8,7 +8,10 @@ module absolute_value {
 
     // If positive, result is `signal`. If not positive, result is `-signal`.
     // One of the terms in the sum will always be zero.
-    abs_signal = (signal * is_positive) + (-signal * is_not_positive)
+    positive_term = mult(signal, is_positive)
+    neg_signal = mult(-1, signal)
+    negative_term = mult(neg_signal, is_not_positive)
+    abs_signal = add(positive_term, negative_term)
 
     output abs_signal
 }
@@ -18,7 +21,7 @@ module absolute_value {
 
 module abs_example {
     // The input signal goes from -5 to 5
-    input_sig = -5 + $step
+    input_sig = add(-5, $step)
 
     abs_output = absolute_value(signal=input_sig)
 
