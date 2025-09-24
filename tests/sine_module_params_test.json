@@ -1,0 +1,23 @@
+{
+  "test_name": "Test sine wave generator with different amplitude and frequency parameters",
+  "module_file": "examples/ex20_sine_wave.txt",
+  "module_name": "sine_wave_generator",
+  "parameters": {
+    "frequency": 2,
+    "amplitude": 3,
+    "dt": 0.1
+  },
+  "max_steps": 8,
+  "expected_output": {
+    "position": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ]
+  }
+}
