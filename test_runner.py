@@ -94,10 +94,17 @@ def run_single_test(test_case: Dict[str, Any]) -> Tuple[bool, str, Dict[str, Lis
                 save=save_expressions
             )
 
-            # Create synthetic AST with just the modified target module
+            # Create synthetic AST with all modules, but replace the target module
+            all_modules = []
+            for module in ast.modules:
+                if module.name == target_module.name:
+                    all_modules.append(modified_module)  # Use the modified version
+                else:
+                    all_modules.append(module)  # Keep the original
+
             synthetic_ast = Program(
                 imports=ast.imports,
-                modules=[modified_module],
+                modules=all_modules,
                 execution=execution
             )
 

@@ -6,7 +6,9 @@ module min {
     term1 = mult(a, is_a_less)
     one_minus_is_a_less = sub(1, is_a_less)
     term2 = mult(b, one_minus_is_a_less)
-    output = add(term1, term2)
+    min_result = add(term1, term2)
+
+    output min_result
 }
 
 module ramp_generator {
