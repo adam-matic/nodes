@@ -173,6 +173,7 @@ class VirtualMachine:
 
         self.module_resolver = ModuleResolver()
         self.operation_order: List[int] = []  # Topologically sorted operation indices
+        self.program_modules: Dict[str, ModuleDefinition] = {}  # Modules from current program
 
     def load_program(self, program: Program):
         """Load a program AST into the VM."""
@@ -180,6 +181,11 @@ class VirtualMachine:
         self.operations.clear()
         self.memory_blocks.clear()
         self.halt_conditions.clear()
+
+        # Store program modules for internal resolution
+        self.program_modules.clear()
+        for module in program.modules:
+            self.program_modules[module.name] = module
 
         # Load all imported modules
         for import_stmt in program.imports:
@@ -229,7 +235,7 @@ class VirtualMachine:
         else:
             raise ValueError(f"Cannot extract signal name from {type(expr)}")
 
-    def _flatten_module(self, module: ModuleDefinition, prefix: str):
+    def _flatten_module(self, module: ModuleDefinition, prefix: str, overridden_params: Optional[Set[str]] = None):
         """Flatten a module into operations and signals."""
         full_prefix = f"{prefix}." if prefix else ""
 
@@ -243,8 +249,8 @@ class VirtualMachine:
                 signal_name = f"{full_prefix}{stmt.name}"
                 self.signals[signal_name] = Signal(signal_name)
 
-                # If parameter has a default value, create a constant operation
-                if stmt.default_value:
+                # If parameter has a default value and wasn't overridden, create a constant operation
+                if stmt.default_value and (overridden_params is None or stmt.name not in overridden_params):
                     value = self._evaluate_constant_expression(stmt.default_value)
                     op = Operation(
                         name="const",
@@ -426,8 +432,11 @@ class VirtualMachine:
 
     def _create_module_instantiation(self, expr: ModuleInstantiation, output_signal: str, prefix: str):
         """Create operations for module instantiation."""
-        # Load the module definition
-        module_def = self.module_resolver.load_module(expr.module_name)
+        # Load the module definition - check program modules first
+        if expr.module_name in self.program_modules:
+            module_def = self.program_modules[expr.module_name]
+        else:
+            module_def = self.module_resolver.load_module(expr.module_name)
 
         # Create instance prefix
         instance_name = output_signal.replace(f"{prefix}", "").replace(".", "")
@@ -444,7 +453,8 @@ class VirtualMachine:
             param_bindings[param_name] = param_signal
 
         # Flatten the module with the instance prefix
-        self._flatten_module(module_def, instance_prefix)
+        overridden_param_names = set(expr.parameters.keys())
+        self._flatten_module(module_def, instance_prefix, overridden_param_names)
 
         # Handle single output case - copy output to the assignment target
         outputs = [stmt for stmt in module_def.body if isinstance(stmt, OutputDeclaration)]
@@ -574,6 +584,8 @@ class VirtualMachine:
             self.signals["$step"].set_value(self.current_step, float(self.current_step))
 
         # Execute operations in topological order
+        halt_triggered = False
+
         for op_idx in self.operation_order:
             op = self.operations[op_idx]
 
@@ -583,16 +595,20 @@ class VirtualMachine:
             try:
                 result = op.execute(self.signals, self.current_step)
 
-                # Check if this is a halt condition before setting the result
-                if op.output in self.halt_conditions and result != 0.0:
-                    self.halted = True
-                    return  # Exit immediately without saving any signals from this step
-
+                # Save the result immediately so other operations can use it
                 if op.output:
                     self.signals[op.output].set_value(self.current_step, result)
 
+                # Check if this is a halt condition (but don't halt yet)
+                if op.output in self.halt_conditions and result != 0.0:
+                    halt_triggered = True
+
             except Exception as e:
                 raise RuntimeError(f"Error executing operation {op.name} at step {self.current_step}: {e}")
+
+        # Set halt flag after all operations are complete
+        if halt_triggered:
+            self.halted = True
 
     def get_results(self) -> Dict[str, List[float]]:
         """Get execution results."""
@@ -601,8 +617,8 @@ class VirtualMachine:
         # Determine how many steps to include
         result_steps = self.current_step
         if self.halted:
-            # If halted, don't include the step that caused the halt
-            result_steps = max(0, self.current_step - 0)
+            # If halted, include the step that caused the halt
+            result_steps = self.current_step
 
         # Always include step numbers
         if "$step" in self.signals:
