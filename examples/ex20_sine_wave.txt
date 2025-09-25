@@ -14,15 +14,31 @@ module sine_wave_generator {
     // Integrator 1: integrates velocity to get position (the sine wave)
     // Integrator 2: integrates acceleration to get velocity (the cosine wave)
 
-    // acceleration = -frequency^2 * position
-    freq_squared = mult(frequency, frequency)
-    neg_freq_squared = mult(-1, freq_squared)
-    acceleration = mult(neg_freq_squared, position)
+    // acceleration = -(2πf)^2 * position (proper angular frequency)
+    pi = 3.14159265359
+    two_pi = mult(2, pi)
+    angular_freq = mult(two_pi, frequency)
+    angular_freq_squared = mult(angular_freq, angular_freq)
+    minus_one = sub(0, 1)
+    neg_angular_freq_squared = mult(minus_one, angular_freq_squared)
 
-    // velocity is the integral of acceleration
-    // Initial velocity is `amplitude * frequency` to start with a cosine
-    initial_velocity = mult(amplitude, frequency)
-    velocity = euler_integrator(signal=acceleration, dt=dt, initial_value=initial_velocity)
+    // Use memory-based approach to break circular dependency
+    position_delayed = mem(0, position)
+    acceleration = mult(neg_angular_freq_squared, position_delayed)
+
+    // Manual Euler integration for velocity with proper initial condition
+    velocity_prev = mem(0, velocity)
+    is_first_step = eq($step, 0)
+    initial_velocity_value = mult(angular_freq, amplitude)
+
+    // velocity[n] = velocity[n-1] + acceleration[n-1] * dt
+    // but velocity[0] = initial_velocity
+    velocity_increment = mult(acceleration, dt)
+    velocity_updated = add(velocity_prev, velocity_increment)
+    term1 = mult(velocity_updated, sub(1, is_first_step))
+    term2 = mult(initial_velocity_value, is_first_step)
+    velocity_with_init = add(term1, term2)
+    velocity = velocity_with_init
 
     // position is the integral of velocity
     // Initial position is 0 to start with a sine
@@ -32,7 +48,7 @@ module sine_wave_generator {
 }
 
 module sine_example {
-    sine_out = sine_wave_generator(frequency=1, amplitude=5)
+    sine_out = sine_wave_generator(frequency=0.1, amplitude=1)
     output sine_out
 }
 

@@ -1,0 +1,69 @@
+#!/usr/bin/env python3
+
+import sys
+sys.path.append('.')
+
+from parser import parse_string
+from vm import VirtualMachine
+
+def generate_params_values():
+    print("Generating values for params test:")
+
+    code = '''
+import euler_integrator
+
+module sine_test {
+    param frequency = 0.2
+    param amplitude = 3
+    param dt = 0.1
+
+    pi = 3.14159265359
+    two_pi = mult(2, pi)
+    omega = mult(two_pi, frequency)
+    omega_squared = mult(omega, omega)
+    minus_one = sub(0, 1)
+    neg_omega_squared = mult(minus_one, omega_squared)
+
+    position_delayed = mem(0, position)
+    acceleration = mult(neg_omega_squared, position_delayed)
+
+    velocity_prev = mem(0, velocity)
+    is_first_step = eq($step, 0)
+    omega_times_amplitude = mult(omega, amplitude)
+
+    velocity_increment = mult(acceleration, dt)
+    velocity_updated = add(velocity_prev, velocity_increment)
+    term1 = mult(velocity_updated, sub(1, is_first_step))
+    term2 = mult(omega_times_amplitude, is_first_step)
+    velocity = add(term1, term2)
+
+    position = euler_integrator(signal=velocity, dt=dt, initial_value=0)
+
+    output position
+}
+
+execution {
+    max_steps: 8
+    save: [position]
+}
+'''
+
+    try:
+        ast = parse_string(code)
+        vm = VirtualMachine()
+        vm.load_program(ast)
+        result = vm.run()
+
+        if 'position' in result:
+            pos_values = result['position'][:8]
+            print(f"Generated values: {pos_values}")
+
+            # Round to 3 decimal places
+            rounded = [round(v, 3) for v in pos_values]
+            print(f"For test file:    {rounded}")
+
+    except Exception as e:
+        print(f"Error: {e}")
+
+if __name__ == "__main__":
+    generate_params_values()

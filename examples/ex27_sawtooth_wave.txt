@@ -19,7 +19,7 @@ module sawtooth_wave_generator {
 }
 
 module sawtooth_wave_example {
-    sawtooth_out = sawtooth_wave_generator(period=25, amplitude=3)
+    sawtooth_out = sawtooth_wave_generator(period=5, amplitude=5)
     output sawtooth_out
 }
 

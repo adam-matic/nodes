@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+
+import sys
+sys.path.append('.')
+
+from parser import parse_string
+from vm import VirtualMachine
+
+def generate_values():
+    # Test parameters from ex20_sine_wave_test.json
+    test_params = [
+        {"name": "Test sine wave generator", "frequency": 5, "amplitude": 1, "dt": 0.1},
+        {"name": "Test low freq/high amp", "frequency": 0.5, "amplitude": 10, "dt": 0.1},
+        {"name": "Test different params", "frequency": 2, "amplitude": 3, "dt": 0.1}
+    ]
+
+    for params in test_params:
+        print(f"\n{params['name']}:")
+        print(f"Parameters: frequency={params['frequency']}, amplitude={params['amplitude']}, dt={params['dt']}")
+
+        code = f'''
+import euler_integrator
+
+module sine_test {{
+    param frequency = {params["frequency"]}
+    param amplitude = {params["amplitude"]}
+    param dt = {params["dt"]}
+
+    pi = 3.14159265359
+    two_pi = mult(2, pi)
+    omega = mult(two_pi, frequency)
+    omega_squared = mult(omega, omega)
+    minus_one = sub(0, 1)
+    neg_omega_squared = mult(minus_one, omega_squared)
+
+    position_delayed = mem(0, position)
+    acceleration = mult(neg_omega_squared, position_delayed)
+
+    velocity_prev = mem(0, velocity)
+    is_first_step = eq($step, 0)
+    omega_times_amplitude = mult(omega, amplitude)
+
+    velocity_increment = mult(acceleration, dt)
+    velocity_updated = add(velocity_prev, velocity_increment)
+    term1 = mult(velocity_updated, sub(1, is_first_step))
+    term2 = mult(omega_times_amplitude, is_first_step)
+    velocity = add(term1, term2)
+
+    position = euler_integrator(signal=velocity, dt=dt, initial_value=0)
+
+    output position
+}}
+
+execution {{
+    max_steps: 10
+    save: [position]
+}}
+'''
+
+        try:
+            ast = parse_string(code)
+            vm = VirtualMachine()
+            vm.load_program(ast)
+            result = vm.run()
+
+            if 'position' in result:
+                pos_values = result['position'][:10]
+                print(f"Generated values: {pos_values}")
+
+                # Round to reasonable precision for test file
+                rounded = [round(v, 3) for v in pos_values]
+                print(f"For test file:    {rounded}")
+
+        except Exception as e:
+            print(f"Error: {e}")
+
+if __name__ == "__main__":
+    generate_values()

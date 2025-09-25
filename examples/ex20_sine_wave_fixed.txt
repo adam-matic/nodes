@@ -1,0 +1,41 @@
+import euler_integrator
+
+module sine_wave_generator {
+    param frequency = 1
+    param amplitude = 1
+    param dt = 0.1
+
+    // To generate a sine wave, we can use a second-order system
+    // where the acceleration is proportional to the negative of the position.
+    // d2x/dt2 = -k * x
+    // This can be modeled with two integrators.
+
+    // First, establish the feedback loop with memory blocks
+    freq_squared = mult(frequency, frequency)
+    neg_freq_squared = mult(-1, freq_squared)
+
+    // Use memory to break the circular dependency
+    position_delayed = mem(0, position)
+    acceleration = mult(neg_freq_squared, position_delayed)
+
+    // velocity is the integral of acceleration
+    // Initial velocity is `amplitude * frequency` to start with a cosine
+    initial_velocity = mult(amplitude, frequency)
+    velocity = euler_integrator(signal=acceleration, dt=dt, initial_value=initial_velocity)
+
+    // position is the integral of velocity
+    // Initial position is 0 to start with a sine
+    position = euler_integrator(signal=velocity, dt=dt, initial_value=0)
+
+    output position
+}
+
+module sine_example {
+    sine_out = sine_wave_generator(frequency=1, amplitude=5)
+    output sine_out
+}
+
+execution {
+    max_steps: 100
+    save: [sine_out]
+}

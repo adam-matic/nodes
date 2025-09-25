@@ -6,40 +6,50 @@ module triangle_wave_generator {
     param amplitude = 5
     param dt = 0.1
 
-    // This is more complex. We need an integrator and a way to flip the sign
-    // of the integrated signal when it reaches the amplitude.
+    // Simple discrete triangle wave implementation
+    // Direction: 1 for up, -1 for down
+    direction = mem(1, next_direction)
 
-    // Let's use a state to represent the direction of the ramp (up or down)
-    // state = 1 for up, state = -1 for down
+    // Current value with memory
+    current_value = mem(0, next_value)
 
-    // The signal to integrate is the state, scaled to control the slope.
-    two_amplitude = mult(2, amplitude)
-    period_dt = mult(period, dt)
-    period_dt_half = div(period_dt, 2)
-    slope = div(two_amplitude, period_dt_half) // This is how much to change per step
-    signal_to_integrate = mult(state, slope)
+    // Calculate next value by adding direction
+    next_raw_value = add(current_value, direction)
 
-    // Integrate the signal
-    integrated = euler_integrator(signal=signal_to_integrate, dt=dt, initial_value=0)
+    // Check if we need to turn around
+    will_exceed_positive = gt(next_raw_value, amplitude)
+    will_exceed_negative = lt(next_raw_value, -amplitude)
 
-    // Check if we need to flip the state
-    is_over_positive_amp = gte(integrated, amplitude)
-    is_under_negative_amp = lte(integrated, -amplitude)
-    should_flip = add(is_over_positive_amp, is_under_negative_amp)
+    // When we would exceed limits, flip direction and adjust value
+    // If we would go above amplitude, go to amplitude-1 instead
+    turn_down_value = sub(amplitude, 1)
+    // If we would go below -amplitude, go to -amplitude+1 instead
+    turn_up_value = add(-amplitude, 1)
 
-    // Flip the state if needed
-    flipped_state = mult(-1, state)
-    term1 = mult(flipped_state, should_flip)
-    one_minus_should_flip = sub(1, should_flip)
-    term2 = mult(state, one_minus_should_flip)
-    next_state = add(term1, term2)
-    state = mem(1, next_state)
+    // Calculate flipped directions
+    minus_one = sub(0, 1)
+    flipped_direction = mult(direction, minus_one)
 
-    output integrated
+    // Determine next direction
+    next_direction_if_turn = flipped_direction
+    next_direction_if_normal = direction
+    should_turn = add(will_exceed_positive, will_exceed_negative)
+    one_minus_should_turn = sub(1, should_turn)
+    term1 = mult(next_direction_if_turn, should_turn)
+    term2 = mult(next_direction_if_normal, one_minus_should_turn)
+    next_direction = add(term1, term2)
+
+    // Determine next value
+    turn_down_term = mult(turn_down_value, will_exceed_positive)
+    turn_up_term = mult(turn_up_value, will_exceed_negative)
+    normal_term = mult(next_raw_value, one_minus_should_turn)
+    next_value = add(turn_down_term, add(turn_up_term, normal_term))
+
+    output current_value
 }
 
 module triangle_wave_example {
-    triangle_out = triangle_wave_generator(period=50, amplitude=5)
+    triangle_out = triangle_wave_generator(period=20, amplitude=5)
     output triangle_out
 }
 

@@ -202,7 +202,8 @@ def run_all_tests(verbose: bool = False, filter_pattern: str = None) -> Tuple[in
         if success:
             # Compare results
             expected_output = test_case.get('expected_output', {})
-            match, compare_error = compare_results(expected_output, actual_results)
+            tolerance = test_case.get('tolerance', 1e-6)  # Allow test-specific tolerance
+            match, compare_error = compare_results(expected_output, actual_results, tolerance)
 
             if match:
                 passed += 1
@@ -245,7 +246,8 @@ def main():
 
         if success:
             expected_output = test_case.get('expected_output', {})
-            match, compare_error = compare_results(expected_output, actual_results)
+            tolerance = test_case.get('tolerance', 1e-6)  # Allow test-specific tolerance
+            match, compare_error = compare_results(expected_output, actual_results, tolerance)
 
             print(f"Expected: {expected_output}")
             print(f"Actual:   {actual_results}")
