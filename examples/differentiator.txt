@@ -1,0 +1,16 @@
+module differentiator {
+    input signal
+    param dt = 0.1
+    param initial_value = 0
+
+    // Get the previous value of the signal.
+    prev_signal = mem(initial_value, signal)
+
+    // Calculate the difference.
+    delta = sub(signal, prev_signal)
+
+    // Divide by the time step.
+    derivative = div(delta, dt)
+
+    output derivative
+}

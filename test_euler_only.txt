@@ -1,0 +1,12 @@
+import euler_integrator
+
+module test_euler {
+    input_signal = 1.0
+    result = euler_integrator(signal=input_signal, dt=0.1, initial_value=0)
+    output result
+}
+
+execution {
+    max_steps: 5
+    save: [result]
+}

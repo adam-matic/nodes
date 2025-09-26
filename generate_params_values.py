@@ -3,8 +3,8 @@
 import sys
 sys.path.append('.')
 
-from parser import parse_string
-from vm import VirtualMachine
+from modular_math.parser import parse_string
+from modular_math.vm import VirtualMachine
 
 def generate_params_values():
     print("Generating values for params test:")

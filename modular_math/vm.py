@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from collections import defaultdict, deque
 import copy
 
-from ast_nodes import *
+from .ast_nodes import *
 
 
 @dataclass
@@ -135,7 +135,7 @@ class ModuleResolver:
         for search_path in self.module_search_paths:
             module_file = f"{search_path}/{module_name}.txt"
             try:
-                from parser import parse_file
+                from .parser import parse_file
                 program = parse_file(module_file)
 
                 # Find the module definition
@@ -521,18 +521,28 @@ class VirtualMachine:
                 signal_producers[op.output] = i
 
         # Build dependencies - but ignore dependencies for mem_read operations
-        # since they read from the previous step
+        # since they read from the previous step, except for initial_signal dependencies
         for i, op in enumerate(self.operations):
             if op.op_type == 'mem_read':
-                # Memory read operations don't depend on current step values
+                # Memory read operations don't depend on current step values,
+                # but they do depend on their initial_signal at step 0
+                if 'initial_signal' in op.params:
+                    initial_signal_name = op.params['initial_signal']
+                    if initial_signal_name in signal_producers:
+                        producer_idx = signal_producers[initial_signal_name]
+                        dependencies[i].add(producer_idx)
+                        dependents[producer_idx].add(i)
                 continue
 
             for input_signal in op.inputs:
                 if input_signal in signal_producers:
                     producer_idx = signal_producers[input_signal]
                     # Don't create dependency if the producer is a mem_read for the same signal
+                    # AND the consumer is also accessing that signal from a previous step
                     producer_op = self.operations[producer_idx]
-                    if producer_op.op_type == 'mem_read' and producer_op.output == input_signal:
+                    if (producer_op.op_type == 'mem_read' and producer_op.output == input_signal and
+                        op.op_type == 'mem_read'):
+                        # Only skip for mem_read -> mem_read dependencies on same signal
                         continue
                     dependencies[i].add(producer_idx)
                     dependents[producer_idx].add(i)

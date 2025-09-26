@@ -1,0 +1,18 @@
+
+module test_params {
+    param a = 10
+    param b = 20
+
+    result = add(a, b)
+    output result
+}
+
+module main {
+    test_result = test_params(a=100, b=200)
+    output test_result
+}
+
+execution {
+    max_steps: 5
+    save: [test_result]
+}

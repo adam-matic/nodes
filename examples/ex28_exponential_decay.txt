@@ -11,7 +11,10 @@ module exponential_decay {
 }
 
 module decay_example {
-    decay_out = exponential_decay(initial_value=50, decay_rate=0.9)
+    param initial_value = 50
+    param decay_rate = 0.9
+
+    decay_out = exponential_decay(initial_value=initial_value, decay_rate=decay_rate)
     output decay_out
 }
 

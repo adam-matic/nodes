@@ -3,9 +3,9 @@
 Debug script to show that amplitude and frequency parameters are being passed correctly.
 """
 
-from parser import parse_file
-from vm import VirtualMachine
-from ast_nodes import *
+from modular_math.parser import parse_file
+from modular_math.vm import VirtualMachine
+from modular_math.ast_nodes import *
 
 def debug_sine_parameters():
     """Show that parameters are being passed correctly to the sine wave generator."""

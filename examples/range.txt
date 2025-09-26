@@ -3,12 +3,14 @@ module range {
     param step_size
     param stop
 
+    // Check if next value would exceed stop before computing it
+    next_step_offset = mult(add($step, 1), step_size)
+    next_value = add(start, next_step_offset)
+    should_stop = gt(next_value, stop)
+    HALT(should_stop)
+
     step_offset = mult($step, step_size)
     current_value = add(start, step_offset)
-
-    // Stop when current value reaches or exceeds stop parameter
-    should_stop = gte(current_value, stop)
-    HALT(should_stop)
 
     output current_value
 }

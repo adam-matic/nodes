@@ -1,0 +1,23 @@
+module toggle_switch {
+    param period = 5
+
+    // Internal counter that goes from 0 to period-1 and repeats
+    next_count = add(count, 1)
+    is_reset = gte(next_count, period)
+    one_minus_is_reset = sub(1, is_reset)
+    reset_mult = mult(next_count, one_minus_is_reset)
+    count = mem(0, reset_mult)
+
+    // Toggle the state when the counter resets (i.e., is_reset is 1)
+    // next_state = if is_reset then (1 - state) else state
+    toggled_state = sub(1, state)
+
+    // This is a multiplexer
+    term1 = mult(toggled_state, is_reset)
+    one_minus_is_reset2 = sub(1, is_reset)
+    term2 = mult(state, one_minus_is_reset2)
+    next_state = add(term1, term2)
+    state = mem(0, next_state)
+
+    output state
+}

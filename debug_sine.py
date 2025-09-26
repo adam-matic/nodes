@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Debug sine wave generator specifically."""
 
-from parser import parse_file
-from vm import VirtualMachine
+from modular_math.parser import parse_file
+from modular_math.vm import VirtualMachine
 
 # Parse the actual sine wave example
 ast = parse_file('/storage/emulated/0/dev/examples/ex20_sine_wave.txt')

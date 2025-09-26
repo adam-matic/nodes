@@ -3,8 +3,8 @@
 Test script for the Virtual Machine
 """
 
-from parser import parse_string, parse_file
-from vm import VirtualMachine
+from modular_math.parser import parse_string, parse_file
+from modular_math.vm import VirtualMachine
 
 
 def test_simple_constant():

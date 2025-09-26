@@ -3,8 +3,8 @@
 import sys
 sys.path.append('.')
 
-from parser import parse_string
-from vm import VirtualMachine
+from modular_math.parser import parse_string
+from modular_math.vm import VirtualMachine
 
 def test_original_freq():
     print("Testing with original frequency (f^2 instead of (2πf)^2)...")

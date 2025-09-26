@@ -1,6 +1,6 @@
 from typing import List, Optional, Dict, Union
-from tokenizer import Token, TokenType, Tokenizer
-from ast_nodes import *
+from .tokenizer import Token, TokenType, Tokenizer
+from .ast_nodes import *
 
 
 class ParseError(Exception):

@@ -35,12 +35,15 @@ module pid_controller {
 // Example of using the PID controller to control a simple first-order system
 module pid_example {
     param setpoint = 10
+    param kp = 2
+    param ki = 0.5
+    param kd = 0.1
 
     // The system we are controlling: a simple integrator (a plant)
     plant_output = euler_integrator(signal=control_signal, dt=0.1, initial_value=0)
 
     // The PID controller
-    control_signal = pid_controller(setpoint=setpoint, process_variable=plant_output, kp=2, ki=0.5, kd=0.1)
+    control_signal = pid_controller(setpoint=setpoint, process_variable=plant_output, kp=kp, ki=ki, kd=kd)
 
     output plant_output
     output control_signal

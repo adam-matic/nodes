@@ -1,0 +1,14 @@
+module high_pass_filter {
+    input signal
+    param alpha = 0.8 // Cut-off factor. Closer to 1 means higher cut-off freq.
+
+    // y_out = alpha * (y_prev + x_in - x_prev)
+    prev_output = mem(0, output)
+    prev_input = mem(0, signal)
+
+    prev_plus_signal = add(prev_output, signal)
+    term = sub(prev_plus_signal, prev_input)
+    output = mult(alpha, term)
+
+    output output
+}

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Debug script to show topological sort order for sine wave example."""
 
-from parser import parse_file
-from vm import VirtualMachine
+from modular_math.parser import parse_file
+from modular_math.vm import VirtualMachine
 
 def debug_operation_order(filename):
     """Parse a file and show the operation order after topological sort."""

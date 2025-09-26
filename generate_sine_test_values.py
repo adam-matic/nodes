@@ -7,9 +7,9 @@ and outputs the actual results for use in test files.
 
 import sys
 import json
-from parser import parse_file
-from vm import VirtualMachine
-from ast_nodes import *
+from modular_math.parser import parse_file
+from modular_math.vm import VirtualMachine
+from modular_math.ast_nodes import *
 
 def test_sine_with_params(frequency, amplitude, dt, max_steps):
     """Test sine wave generator with given parameters."""

@@ -6,7 +6,9 @@ module square_wave_generator {
     param amplitude = 5
 
     // Use the toggle switch to create a 0-1 signal
-    toggle = toggle_switch(period=period)
+    // For a square wave, we want to toggle every period/2 steps
+    half_period = div(period, 2)
+    toggle = toggle_switch(period=half_period)
 
     // Scale and shift the 0-1 signal to be a -amplitude to +amplitude square wave
     // Formula: output = (2 * toggle - 1) * amplitude
@@ -18,7 +20,10 @@ module square_wave_generator {
 }
 
 module square_wave_example {
-    square_out = square_wave_generator(period=20, amplitude=2)
+    param period = 20
+    param amplitude = 2
+
+    square_out = square_wave_generator(period=period, amplitude=amplitude)
     output square_out
 }
 

@@ -3,9 +3,9 @@
 Isolated test for the min module to debug why it's outputting zeros.
 """
 
-from parser import parse_string, ParseError
-from vm import VirtualMachine
-from ast_nodes import *
+from modular_math.parser import parse_string, ParseError
+from modular_math.vm import VirtualMachine
+from modular_math.ast_nodes import *
 
 # Test the min module in isolation
 test_code = """

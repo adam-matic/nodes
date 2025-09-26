@@ -3,8 +3,8 @@
 Test the min module exactly as defined in the ramp generator.
 """
 
-from parser import parse_string, ParseError
-from vm import VirtualMachine
+from modular_math.parser import parse_string, ParseError
+from modular_math.vm import VirtualMachine
 
 # Test the exact min module from ramp generator
 test_code = """

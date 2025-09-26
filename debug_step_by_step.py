@@ -1,85 +1,85 @@
 #!/usr/bin/env python3
 
 import sys
-sys.path.append('.')
+sys.path.append('/storage/emulated/0/dev')
 
-from parser import parse_string
-from vm import VirtualMachine
+from modular_math.parser import parse_file
+from modular_math.vm import VirtualMachine
+from modular_math.ast_nodes import *
 
-def test_step_by_step():
-    print("Testing step-by-step sine wave...")
+# Run with test parameters
+print("=== STEP-BY-STEP DEBUG ===")
+ast = parse_file("examples/ex28_exponential_decay.txt")
 
-    code = '''
-import euler_integrator
+target_module = None
+for module in ast.modules:
+    if module.name == 'decay_example':
+        target_module = module
+        break
 
-module debug_sine {
-    param frequency = 1
-    param amplitude = 1
-    param dt = 0.1
+test_params = {'initial_value': 100, 'decay_rate': 0.8}
+new_body = []
+for stmt in target_module.body:
+    if isinstance(stmt, ParameterDeclaration) and stmt.name in test_params:
+        param_value = test_params[stmt.name]
+        new_param = ParameterDeclaration(
+            name=stmt.name,
+            default_value=NumberLiteral(value=float(param_value))
+        )
+        new_body.append(new_param)
+    else:
+        new_body.append(stmt)
 
-    // Calculate constants
-    pi = 3.14159265359
-    two_pi = mult(2, pi)
-    omega = mult(two_pi, frequency)
-    omega_squared = mult(omega, omega)
-    minus_one = sub(0, 1)
-    neg_omega_squared = mult(minus_one, omega_squared)
+modified_module = ModuleDefinition(name=target_module.name, body=new_body)
+execution = ExecutionBlock(max_steps=5, save=[Identifier(name='decay_out')])
+all_modules = [modified_module if m.name == target_module.name else m for m in ast.modules]
+synthetic_ast = Program(imports=ast.imports, modules=all_modules, execution=execution)
 
-    // Break circular dependency
-    position_delayed = mem(0, position)
-    acceleration = mult(neg_omega_squared, position_delayed)
+vm = VirtualMachine()
+vm.load_program(synthetic_ast)
+vm.max_steps = 1  # Only run 1 step for detailed analysis
 
-    // Manual velocity integration
-    velocity_prev = mem(0, velocity)
-    is_first_step = eq($step, 0)
-    omega_times_amplitude = mult(omega, amplitude)
+print(f"Execution order: {vm.operation_order}")
 
-    velocity_increment = mult(acceleration, dt)
-    velocity_updated = add(velocity_prev, velocity_increment)
-    term1 = mult(velocity_updated, sub(1, is_first_step))
-    term2 = mult(omega_times_amplitude, is_first_step)
-    velocity = add(term1, term2)
+# Execute step 0 manually with debugging
+print(f"\n=== EXECUTING STEP 0 ===")
+vm.current_step = 0
+vm.signals["$step"].set_value(0, 0.0)
 
-    // Position integration
-    position = euler_integrator(signal=velocity, dt=dt, initial_value=0)
+for op_idx in vm.operation_order:
+    op = vm.operations[op_idx]
 
-    output position_delayed
-    output acceleration
-    output velocity
-    output position
-}
+    print(f"\n--- Executing Op {op_idx}: {op.name} ({op.op_type}) -> {op.output} ---")
 
-execution {
-    max_steps: 4
-    save: [position_delayed, acceleration, velocity, position]
-}
-'''
+    if op.op_type == 'mem_write':
+        continue
 
     try:
-        ast = parse_string(code)
-        vm = VirtualMachine()
-        vm.load_program(ast)
-        result = vm.run()
+        # Check input values before execution
+        if hasattr(op, 'inputs') and op.inputs:
+            print(f"  Inputs before:")
+            for input_name in op.inputs:
+                if input_name in vm.signals:
+                    val = vm.signals[input_name].get_value(0)
+                    print(f"    {input_name}: {val}")
+                else:
+                    print(f"    {input_name}: MISSING")
 
-        print("Step-by-step analysis:")
-        for step in range(4):
-            pos_delayed = result.get('position_delayed', [0]*4)[step]
-            accel = result.get('acceleration', [0]*4)[step]
-            vel = result.get('velocity', [0]*4)[step]
-            pos = result.get('position', [0]*4)[step]
-            print(f"Step {step}: pos_delayed={pos_delayed:.3f}, accel={accel:.3f}, vel={vel:.3f}, pos={pos:.3f}")
+        if op.params:
+            print(f"  Params: {op.params}")
 
-        # Expected for sine wave:
-        # Step 0: pos=0, vel=ω*A=6.28
-        # Step 1: pos≈vel*dt=0.628 (but sine should be ~0.588)
-        print("\nExpected sine behavior:")
-        print("Step 0: pos=0.000, vel=6.283")
-        print("Step 1: pos≈0.628")
+        result = op.execute(vm.signals, 0)
+        print(f"  Result: {result}")
+
+        if op.output:
+            vm.signals[op.output].set_value(0, result)
+            print(f"  Set signal '{op.output}' = {result}")
 
     except Exception as e:
-        print(f"Error: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"  ERROR: {e}")
 
-if __name__ == "__main__":
-    test_step_by_step()
+print(f"\n=== FINAL SIGNAL VALUES AT STEP 0 ===")
+for signal_name, signal in vm.signals.items():
+    if 'decay_out' in signal_name or signal_name == 'initial_value' or 'current_value' in signal_name:
+        val = signal.get_value(0)
+        print(f"  {signal_name}: {val}")

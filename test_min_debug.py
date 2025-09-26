@@ -3,8 +3,8 @@
 Debug the min module step by step.
 """
 
-from parser import parse_string, ParseError
-from vm import VirtualMachine
+from modular_math.parser import parse_string, ParseError
+from modular_math.vm import VirtualMachine
 
 # Test each part of min module individually
 test_code = """

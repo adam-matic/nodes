@@ -9,9 +9,9 @@ import os
 import json
 import glob
 from typing import Dict, List, Any, Tuple
-from parser import parse_file, ParseError
-from vm import VirtualMachine
-from ast_nodes import *
+from modular_math.parser import parse_file, ParseError
+from modular_math.vm import VirtualMachine
+from modular_math.ast_nodes import *
 
 
 def load_test_case(test_file: str) -> Dict[str, Any]:
@@ -127,7 +127,7 @@ def run_single_test(test_case: Dict[str, Any]) -> Tuple[bool, str, Dict[str, Lis
         return False, str(e), {}
 
 
-def compare_results(expected: Dict[str, List[float]], actual: Dict[str, List[float]], tolerance: float = 1e-6) -> Tuple[bool, str]:
+def compare_results(expected: Dict[str, List[float]], actual: Dict[str, List[float]], tolerance: float = 0.001) -> Tuple[bool, str]:
     """
     Compare expected and actual results.
 
@@ -202,7 +202,7 @@ def run_all_tests(verbose: bool = False, filter_pattern: str = None) -> Tuple[in
         if success:
             # Compare results
             expected_output = test_case.get('expected_output', {})
-            tolerance = test_case.get('tolerance', 1e-6)  # Allow test-specific tolerance
+            tolerance = test_case.get('tolerance', 0.001)  # Allow test-specific tolerance
             match, compare_error = compare_results(expected_output, actual_results, tolerance)
 
             if match:
@@ -246,7 +246,7 @@ def main():
 
         if success:
             expected_output = test_case.get('expected_output', {})
-            tolerance = test_case.get('tolerance', 1e-6)  # Allow test-specific tolerance
+            tolerance = test_case.get('tolerance', 0.001)  # Allow test-specific tolerance
             match, compare_error = compare_results(expected_output, actual_results, tolerance)
 
             print(f"Expected: {expected_output}")

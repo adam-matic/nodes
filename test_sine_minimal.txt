@@ -1,0 +1,24 @@
+import euler_integrator
+
+module test_sine {
+    param frequency = 1
+    param amplitude = 1
+    param dt = 0.1
+
+    freq_squared = mult(frequency, frequency)
+    neg_freq_squared = mult(-1, freq_squared)
+    acceleration = mult(neg_freq_squared, position)
+
+    initial_velocity = mult(amplitude, frequency)
+    velocity = euler_integrator(signal=acceleration, dt=dt, initial_value=initial_velocity)
+    position = euler_integrator(signal=velocity, dt=dt, initial_value=0)
+
+    output position
+    output velocity
+    output acceleration
+}
+
+execution {
+    max_steps: 5
+    save: [position, velocity, acceleration]
+}

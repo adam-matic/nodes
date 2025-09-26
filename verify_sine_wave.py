@@ -4,8 +4,8 @@ import sys
 import math
 sys.path.append('.')
 
-from parser import parse_string
-from vm import VirtualMachine
+from modular_math.parser import parse_string
+from modular_math.vm import VirtualMachine
 
 def verify_sine_wave():
     print("Verifying sine wave behavior over longer period...")
