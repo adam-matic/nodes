@@ -27,9 +27,9 @@ module pid_controller {
 
     // PID output
     p_plus_i = add(p_term, i_term)
-    output = add(p_plus_i, d_term)
+    output_val = add(p_plus_i, d_term)
 
-    output output
+    output output_val
 }
 
 // Example of using the PID controller to control a simple first-order system

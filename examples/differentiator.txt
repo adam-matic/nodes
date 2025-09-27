@@ -10,7 +10,7 @@ module differentiator {
     delta = sub(signal, prev_signal)
 
     // Divide by the time step.
-    derivative = div(delta, dt)
+    output_val = div(delta, dt)
 
-    output derivative
+    output output_val
 }

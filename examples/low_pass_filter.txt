@@ -5,11 +5,11 @@ module low_pass_filter {
     // y_out = y_prev + alpha * (x_in - y_prev)
     // y_out = (1 - alpha) * y_prev + alpha * x_in
 
-    prev_output = mem(0, output)
+    prev_output = mem(0, output_val)
     one_minus_alpha = sub(1, alpha)
     term1 = mult(one_minus_alpha, prev_output)
     term2 = mult(alpha, signal)
-    output = add(term1, term2)
+    output_val = add(term1, term2)
 
-    output output
+    output output_val
 }

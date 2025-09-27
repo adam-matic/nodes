@@ -157,8 +157,7 @@ class Parser:
     def parse_output_declaration(self) -> OutputDeclaration:
         """Parse an output declaration."""
         self.expect(TokenType.OUTPUT)
-        # Allow identifier, output keyword, or step variable as the output name
-        if self.match(TokenType.IDENTIFIER, TokenType.OUTPUT, TokenType.STEP_VARIABLE):
+        if self.match(TokenType.IDENTIFIER, TokenType.STEP_VARIABLE):
             name = self.advance().value
         else:
             raise ParseError("Expected identifier for output name", self.current_token())
@@ -174,8 +173,7 @@ class Parser:
 
     def parse_assignment(self) -> Assignment:
         """Parse an assignment statement."""
-        # Allow keywords to be used as variable names in assignments
-        if self.match(TokenType.IDENTIFIER, TokenType.OUTPUT, TokenType.INPUT, TokenType.PARAM):
+        if self.match(TokenType.IDENTIFIER):
             target = self.advance().value
         else:
             raise ParseError("Expected identifier for assignment target", self.current_token())
@@ -322,11 +320,6 @@ class Parser:
             return NumberLiteral(value=value)
 
         if self.match(TokenType.IDENTIFIER):
-            name = self.advance().value
-            return Identifier(name=name)
-
-        # Allow keywords to be used as identifiers in expression context
-        if self.match(TokenType.OUTPUT, TokenType.INPUT, TokenType.PARAM):
             name = self.advance().value
             return Identifier(name=name)
 

@@ -174,8 +174,22 @@ class Tokenizer:
             line, column = self.line, self.column
 
             # Handle comments
-            if char == '/' and self.peek_char() == '/':
-                self.skip_comment()
+            if char == '/' and self.peek_char() == '/': # Single-line comment
+                while self.current_char() and self.current_char() != '\n':
+                    self.advance()
+                continue
+            elif char == '/' and self.peek_char() == '*': # Multi-line comment
+                self.advance() # consume '/'
+                self.advance() # consume '*'
+                start_line = self.line
+                while self.current_char():
+                    if self.current_char() == '*' and self.peek_char() == '/':
+                        self.advance() # consume '*'
+                        self.advance() # consume '/'
+                        break
+                    self.advance()
+                else:
+                    raise SyntaxError(f"Unterminated multi-line comment starting on line {start_line}")
                 continue
 
             # Handle newlines
