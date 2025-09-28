@@ -1,6 +1,6 @@
 {
   "test_name": "Test toggle switch with period 5",
-  "module_file": "examples/ex15_toggle_switch.txt",
+  "module_file": "examples/advanced/ex15_toggle_switch.txt",
   "module_name": "toggle_switch",
   "parameters": {
     "period": 5

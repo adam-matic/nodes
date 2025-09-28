@@ -1,6 +1,6 @@
 {
   "test_name": "Test composition of const modules",
-  "module_file": "examples/ex07_composing_const.txt",
+  "module_file": "examples/basic/ex07_composing_const.txt",
   "module_name": "compose_consts",
   "parameters": {},
   "max_steps": 1,

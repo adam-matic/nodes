@@ -1,6 +1,6 @@
 {
   "test_name": "Test Euler integrator with constant input",
-  "module_file": "examples/ex10_integrator_usage.txt",
+  "module_file": "examples/control_systems/ex10_integrator_usage.txt",
   "module_name": "integrator_usage",
   "parameters": {},
   "max_steps": 5,

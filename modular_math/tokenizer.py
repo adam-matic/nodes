@@ -12,11 +12,13 @@ class TokenType(Enum):
     OUTPUT = "OUTPUT"
     EXECUTION = "EXECUTION"
     IMPORT = "IMPORT"
+    FROM = "FROM"
     HALT = "HALT"
 
     # Identifiers and literals
     IDENTIFIER = "IDENTIFIER"
     NUMBER = "NUMBER"
+    STRING = "STRING"
 
     # Operators
     PLUS = "PLUS"
@@ -83,6 +85,7 @@ class Tokenizer:
             'output': TokenType.OUTPUT,
             'execution': TokenType.EXECUTION,
             'import': TokenType.IMPORT,
+            'from': TokenType.FROM,
             'HALT': TokenType.HALT,
             'add': TokenType.ADD,
             'sub': TokenType.SUB,
@@ -163,6 +166,40 @@ class Tokenizer:
 
         return Token(TokenType.STEP_VARIABLE, value, start_line, start_column)
 
+    def read_string(self) -> Token:
+        """Read a string literal."""
+        start_line, start_column = self.line, self.column
+        value = ""
+
+        # Skip opening quote
+        self.advance()
+
+        while self.current_char() and self.current_char() != '"':
+            if self.current_char() == '\\':
+                # Handle escape sequences
+                self.advance()
+                if self.current_char() == 'n':
+                    value += '\n'
+                elif self.current_char() == 't':
+                    value += '\t'
+                elif self.current_char() == '\\':
+                    value += '\\'
+                elif self.current_char() == '"':
+                    value += '"'
+                else:
+                    value += self.current_char()
+            else:
+                value += self.current_char()
+            self.advance()
+
+        if not self.current_char():
+            raise SyntaxError(f"Unterminated string starting on line {start_line}")
+
+        # Skip closing quote
+        self.advance()
+
+        return Token(TokenType.STRING, value, start_line, start_column)
+
     def tokenize(self) -> List[Token]:
         while self.current_char():
             self.skip_whitespace()
@@ -206,6 +243,11 @@ class Tokenizer:
             # Handle step variable
             if char == '$':
                 self.tokens.append(self.read_step_variable())
+                continue
+
+            # Handle strings
+            if char == '"':
+                self.tokens.append(self.read_string())
                 continue
 
             # Handle identifiers and keywords

@@ -88,8 +88,14 @@ class Parser:
         """Parse an import statement."""
         self.expect(TokenType.IMPORT)
         module_name = self.expect(TokenType.IDENTIFIER).value
+
+        module_path = None
+        if self.match(TokenType.FROM):
+            self.advance()  # consume 'from'
+            module_path = self.expect(TokenType.STRING).value
+
         self.skip_newlines()
-        return ImportStatement(module_name=module_name)
+        return ImportStatement(module_name=module_name, module_path=module_path)
 
     def parse_module(self) -> ModuleDefinition:
         """Parse a module definition."""

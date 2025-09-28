@@ -1,6 +1,6 @@
 {
   "test_name": "Test division of two constants",
-  "module_file": "examples/ex12_division.txt",
+  "module_file": "examples/basic/ex12_division.txt",
   "module_name": "division_example",
   "parameters": {},
   "max_steps": 1,

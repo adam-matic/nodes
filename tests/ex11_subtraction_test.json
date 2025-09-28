@@ -1,6 +1,6 @@
 {
   "test_name": "Test subtraction of two constants",
-  "module_file": "examples/ex11_subtraction.txt",
+  "module_file": "examples/basic/ex11_subtraction.txt",
   "module_name": "subtraction_example",
   "parameters": {},
   "max_steps": 1,

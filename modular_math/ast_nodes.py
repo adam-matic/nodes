@@ -101,6 +101,7 @@ class HaltStatement(Statement):
 class ImportStatement(Statement):
     """Represents an import statement."""
     module_name: str
+    module_path: Optional[str] = None  # None means use search paths
 
 
 @dataclass

@@ -1,6 +1,6 @@
 {
   "test_name": "Test scaled step with custom scale factor",
-  "module_file": "examples/ex03_scaled_step.txt",
+  "module_file": "examples/basic/ex03_scaled_step.txt",
   "module_name": "scaled_step",
   "parameters": {
     "scale_factor": 2

@@ -1,6 +1,6 @@
 {
   "test_name": "Debug sine wave generator",
-  "module_file": "examples/ex20_sine_wave.txt",
+  "module_file": "examples/advanced/ex20_sine_wave.txt",
   "module_name": "sine_example",
   "parameters": {},
   "max_steps": 5,

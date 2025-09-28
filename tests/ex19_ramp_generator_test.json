@@ -1,6 +1,6 @@
 {
   "test_name": "Test ramp generator",
-  "module_file": "examples/ex19_ramp_generator.txt",
+  "module_file": "examples/advanced/ex19_ramp_generator.txt",
   "module_name": "ramp_generator",
   "parameters": {
     "ramp_end_value": 3

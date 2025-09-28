@@ -1,6 +1,6 @@
 {
   "test_name": "Test signal gate",
-  "module_file": "examples/ex17_signal_gate.txt",
+  "module_file": "examples/advanced/ex17_signal_gate.txt",
   "module_name": "gate_example",
   "parameters": {},
   "max_steps": 8,

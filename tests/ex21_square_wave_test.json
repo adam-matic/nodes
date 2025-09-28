@@ -1,6 +1,6 @@
 {
   "test_name": "Test square wave generator",
-  "module_file": "examples/ex21_square_wave.txt",
+  "module_file": "examples/advanced/ex21_square_wave.txt",
   "module_name": "square_wave_example",
   "parameters": {
     "period": 10,

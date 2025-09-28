@@ -1,6 +1,6 @@
 {
   "test_name": "Test sine wave generator",
-  "module_file": "examples/ex20_sine_wave.txt",
+  "module_file": "examples/advanced/ex20_sine_wave.txt",
   "module_name": "sine_example",
   "parameters": {"frequency": 0.1, "amplitude": 1, "dt": 0.1},
   "max_steps": 10,

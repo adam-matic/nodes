@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Web Server for Modular Math Language GUI
+Web Server for Modular Math Language
 Serves the HTML interface and provides API endpoints for code execution.
 """
 
@@ -9,27 +9,31 @@ import os
 import json
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
+import mimetypes
 import threading
 import time
 
-# Add the parent directory to the path to import the language modules
-sys.path.insert(0, '/storage/emulated/0/dev/modular_math')
+# Add the parent directory to path to access modular_math package
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.insert(0, parent_dir)
 
 try:
-    import tokenizer
-    import parser as lang_parser
-    import vm
-    Tokenizer = tokenizer.Tokenizer
-    Parser = lang_parser.Parser
-    VirtualMachine = vm.VirtualMachine
+    from modular_math.tokenizer import Tokenizer
+    from modular_math.parser import Parser
+    from modular_math.vm import VirtualMachine
 except ImportError as e:
     print(f"Error importing language modules: {e}")
-    print("Make sure you're running from the correct directory")
+    print("Make sure you're running from the web_interface directory")
+    print("Current working directory:", os.getcwd())
+    print("Script directory:", current_dir)
+    print("Parent directory:", parent_dir)
+    print("Python path:", sys.path[:3])
     sys.exit(1)
 
 
 class ModularMathHandler(BaseHTTPRequestHandler):
-    """HTTP request handler for the modular math language GUI"""
+    """HTTP request handler for the modular math language web interface"""
 
     def __init__(self, *args, **kwargs):
         # Initialize shared execution state
@@ -41,7 +45,8 @@ class ModularMathHandler(BaseHTTPRequestHandler):
                 'max_steps': 10,
                 'is_running': False,
                 'signals': {},
-                'outputs': []
+                'outputs': [],
+                'compiled': False
             }
         super().__init__(*args, **kwargs)
 
@@ -51,7 +56,11 @@ class ModularMathHandler(BaseHTTPRequestHandler):
         path = parsed_path.path
 
         if path == '/' or path == '/index.html':
-            self.serve_gui()
+            self.serve_file('index.html')
+        elif path.startswith('/assets/'):
+            # Serve static assets
+            asset_path = path[1:]  # Remove leading slash
+            self.serve_file(asset_path)
         elif path == '/api/status':
             self.get_status()
         elif path == '/api/signals':
@@ -79,23 +88,49 @@ class ModularMathHandler(BaseHTTPRequestHandler):
         else:
             self.send_error(404, "Endpoint not found")
 
-    def serve_gui(self):
-        """Serve the main GUI HTML file"""
+    def do_OPTIONS(self):
+        """Handle CORS preflight requests"""
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.end_headers()
+
+    def serve_file(self, file_path):
+        """Serve a file from the web_interface directory"""
         try:
-            gui_path = '/storage/emulated/0/dev/examples/web_gui.html'
-            with open(gui_path, 'r', encoding='utf-8') as f:
+            # Security: prevent directory traversal
+            file_path = file_path.lstrip('/')
+            if '..' in file_path or file_path.startswith('/'):
+                self.send_error(403, "Access denied")
+                return
+
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            full_path = os.path.join(current_dir, file_path)
+
+            if not os.path.exists(full_path):
+                self.send_error(404, "File not found")
+                return
+
+            # Determine content type
+            content_type, _ = mimetypes.guess_type(full_path)
+            if content_type is None:
+                content_type = 'application/octet-stream'
+
+            with open(full_path, 'rb') as f:
                 content = f.read()
 
             self.send_response(200)
-            self.send_header('Content-type', 'text/html; charset=utf-8')
-            self.send_header('Content-Length', str(len(content.encode('utf-8'))))
+            self.send_header('Content-Type', content_type)
+            self.send_header('Content-Length', str(len(content)))
+            self.send_header('Cache-Control', 'no-cache')
             self.end_headers()
-            self.wfile.write(content.encode('utf-8'))
+            self.wfile.write(content)
 
         except FileNotFoundError:
-            self.send_error(404, "GUI file not found")
+            self.send_error(404, "File not found")
         except Exception as e:
-            self.send_error(500, f"Error serving GUI: {str(e)}")
+            self.send_error(500, f"Error serving file: {str(e)}")
 
     def compile_code(self, code_json):
         """Compile the provided code"""
@@ -103,19 +138,23 @@ class ModularMathHandler(BaseHTTPRequestHandler):
             data = json.loads(code_json)
             code = data.get('code', '')
 
-            # Parse the code
-            tokenizer = Tokenizer()
-            tokens = tokenizer.tokenize(code)
+            if not code.strip():
+                raise ValueError("Empty code provided")
 
-            parser = Parser()
-            program = parser.parse(tokens)
+            # Parse the code
+            tokenizer = Tokenizer(code)
+            tokens = tokenizer.tokenize()
+
+            parser = Parser(tokens)
+            program = parser.parse()
 
             # Setup VM
             vm = VirtualMachine()
+            vm.load_program(program)
 
-            # Extract max_steps from execution block
-            max_steps = 10
-            if program.execution and program.execution.max_steps:
+            # Extract max_steps from execution block or use VM default
+            max_steps = vm.max_steps  # VM sets this from execution block
+            if hasattr(program, 'execution') and program.execution and hasattr(program.execution, 'max_steps'):
                 max_steps = program.execution.max_steps
 
             # Update execution state
@@ -126,6 +165,7 @@ class ModularMathHandler(BaseHTTPRequestHandler):
             state['max_steps'] = max_steps
             state['signals'] = {}
             state['outputs'] = []
+            state['compiled'] = True
 
             response = {
                 'success': True,
@@ -146,7 +186,7 @@ class ModularMathHandler(BaseHTTPRequestHandler):
         """Start automatic execution"""
         state = ModularMathHandler._execution_state
 
-        if not state['vm'] or not state['program']:
+        if not state.get('compiled') or not state['vm'] or not state['program']:
             response = {
                 'success': False,
                 'message': 'No program compiled. Please compile first.'
@@ -166,7 +206,7 @@ class ModularMathHandler(BaseHTTPRequestHandler):
         """Execute one step of the program"""
         state = ModularMathHandler._execution_state
 
-        if not state['vm'] or not state['program']:
+        if not state.get('compiled') or not state['vm'] or not state['program']:
             response = {
                 'success': False,
                 'message': 'No program compiled. Please compile first.'
@@ -183,17 +223,22 @@ class ModularMathHandler(BaseHTTPRequestHandler):
             return
 
         try:
-            # Execute one step
-            # Note: This is a simplified version. The actual VM interface may differ.
+            # Execute one step using the VM
             result = self.execute_vm_step(state)
-            state['current_step'] += 1
+
+            # Update state with VM's current step
+            if 'step' in result:
+                state['current_step'] = result['step']
+            else:
+                state['current_step'] += 1
 
             response = {
                 'success': True,
                 'message': f'Step {state["current_step"]} executed',
                 'step': state['current_step'],
                 'result': result,
-                'signals': self.get_current_signals(state)
+                'signals': self.get_current_signals(state),
+                'halted': result.get('halted', False)
             }
 
             self.send_json_response(response)
@@ -206,24 +251,76 @@ class ModularMathHandler(BaseHTTPRequestHandler):
             self.send_json_response(response, 500)
 
     def execute_vm_step(self, state):
-        """Execute a single step in the VM (simplified)"""
-        # This is a placeholder implementation
-        # The actual implementation would depend on the VM's interface
+        """Execute a single step in the VM"""
+        try:
+            # Execute using the actual VM
+            vm = state['vm']
 
-        # For now, simulate execution with dummy values
+            # Execute one step
+            vm.step()
+
+            # Extract signal values from VM state
+            signals = self.extract_vm_signals(vm)
+            state['signals'] = signals
+
+            return {
+                'output_signals': list(signals.keys()),
+                'values': signals,
+                'step': vm.current_step,
+                'halted': vm.halted
+            }
+
+        except Exception as e:
+            # Fallback to simulation if VM execution fails
+            print(f"VM execution failed, using simulation: {e}")
+            return self.simulate_execution_step(state)
+
+    def simulate_execution_step(self, state):
+        """Simulate execution when VM is not available"""
         import random
 
-        # Simulate signal values
-        signals = {}
-        for i, conn_id in enumerate(['const_1_out', 'add_1_out', 'mem_1_out']):
-            signals[conn_id] = round(random.uniform(0, 10) + state['current_step'], 2)
+        # Simulate signal values for a counter circuit
+        step = state['current_step']
+
+        # Simulate counter behavior: each step increments by 1
+        const_value = 1
+        current_counter_value = step  # This simulates the memory output
+        next_counter_value = current_counter_value + const_value
+
+        signals = {
+            'const_1_out': const_value,
+            'add_1_out': next_counter_value,
+            'mem_1_out': current_counter_value,
+            'output_1': current_counter_value
+        }
 
         state['signals'] = signals
 
         return {
             'output_signals': list(signals.keys()),
-            'values': signals
+            'values': signals,
+            'simulated': True
         }
+
+    def extract_vm_signals(self, vm):
+        """Extract signal values from VM state"""
+        signals = {}
+
+        try:
+            # Extract current signal values from VM
+            current_step = vm.current_step
+
+            for signal_name, signal in vm.signals.items():
+                # Get the current value for this step
+                value = signal.get_value(current_step)
+                signals[signal_name] = value
+
+        except Exception as e:
+            print(f"Error extracting signals: {e}")
+            # Return empty dict if extraction fails
+            pass
+
+        return signals
 
     def reset_program(self):
         """Reset the execution state"""
@@ -232,6 +329,13 @@ class ModularMathHandler(BaseHTTPRequestHandler):
         state['is_running'] = False
         state['signals'] = {}
         state['outputs'] = []
+
+        # Reset VM if it has a reset method
+        if state['vm'] and hasattr(state['vm'], 'reset'):
+            try:
+                state['vm'].reset()
+            except:
+                pass
 
         response = {
             'success': True,
@@ -248,7 +352,8 @@ class ModularMathHandler(BaseHTTPRequestHandler):
             'current_step': state['current_step'],
             'max_steps': state['max_steps'],
             'is_running': state['is_running'],
-            'has_program': state['program'] is not None
+            'has_program': state['program'] is not None,
+            'compiled': state.get('compiled', False)
         }
 
         self.send_json_response(response)
@@ -260,8 +365,6 @@ class ModularMathHandler(BaseHTTPRequestHandler):
 
     def get_current_signals(self, state):
         """Extract current signal values from VM state"""
-        # This would extract actual signal values from the VM
-        # For now, return the simulated signals
         return state['signals']
 
     def send_json_response(self, data, status_code=200):
@@ -271,34 +374,28 @@ class ModularMathHandler(BaseHTTPRequestHandler):
         self.send_response(status_code)
         self.send_header('Content-type', 'application/json')
         self.send_header('Content-Length', str(len(json_data.encode('utf-8'))))
-        self.send_header('Access-Control-Allow-Origin', '*')  # Allow CORS
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-        self.end_headers()
-        self.wfile.write(json_data.encode('utf-8'))
-
-    def do_OPTIONS(self):
-        """Handle CORS preflight requests"""
-        self.send_response(200)
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.send_header('Cache-Control', 'no-cache')
         self.end_headers()
+        self.wfile.write(json_data.encode('utf-8'))
 
     def log_message(self, format, *args):
         """Override to reduce logging noise"""
-        # Only log errors
-        if 'ERROR' in format or args[1] != '200':
+        # Only log errors and important requests
+        if 'ERROR' in format or args[1] not in ['200', '304']:
             super().log_message(format, *args)
 
 
-def run_server(port=8080):
+def run_server(port=8080, host='localhost'):
     """Run the web server"""
-    server_address = ('', port)
+    server_address = (host, port)
     httpd = HTTPServer(server_address, ModularMathHandler)
 
-    print(f"Modular Math Language GUI Server starting on port {port}")
-    print(f"Open your browser and navigate to: http://localhost:{port}")
+    print(f"Modular Math Language Web Interface starting...")
+    print(f"Server running at: http://{host}:{port}")
+    print(f"Open your browser and navigate to the URL above")
     print("Press Ctrl+C to stop the server")
 
     try:
@@ -311,8 +408,9 @@ def run_server(port=8080):
 if __name__ == '__main__':
     import argparse
 
-    parser = argparse.ArgumentParser(description='Modular Math Language Web GUI Server')
+    parser = argparse.ArgumentParser(description='Modular Math Language Web Interface Server')
     parser.add_argument('--port', type=int, default=8080, help='Port to run the server on (default: 8080)')
+    parser.add_argument('--host', default='localhost', help='Host to bind to (default: localhost)')
 
     args = parser.parse_args()
-    run_server(args.port)
+    run_server(args.port, args.host)

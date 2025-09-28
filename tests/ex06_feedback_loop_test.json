@@ -1,6 +1,6 @@
 {
   "test_name": "Test accumulator feedback loop",
-  "module_file": "examples/ex06_feedback_loop.txt",
+  "module_file": "examples/basic/ex06_feedback_loop.txt",
   "module_name": "accumulator",
   "parameters": {
     "initial_value": 5,

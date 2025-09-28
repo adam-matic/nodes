@@ -1,6 +1,6 @@
 {
   "test_name": "Test addition of two constants",
-  "module_file": "examples/ex01_addition.txt",
+  "module_file": "examples/basic/ex01_addition.txt",
   "module_name": "addition_example",
   "parameters": {},
   "max_steps": 1,

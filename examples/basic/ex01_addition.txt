@@ -1,4 +1,4 @@
-import const
+import const from "const.txt"
 
 module addition_example {
     a = const(value=10)

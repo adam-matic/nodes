@@ -6,9 +6,15 @@ Runs all test cases and compares VM output against expected results.
 """
 
 import os
+import sys
 import json
 import glob
 from typing import Dict, List, Any, Tuple
+from pathlib import Path
+
+# Add the parent directory to the Python path so we can import modular_math
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 from modular_math.parser import parse_file, ParseError
 from modular_math.vm import VirtualMachine
 from modular_math.ast_nodes import *
@@ -112,7 +118,7 @@ def run_single_test(test_case: Dict[str, Any]) -> Tuple[bool, str, Dict[str, Lis
 
         # Create VM and load program
         vm = VirtualMachine()
-        vm.load_program(ast)
+        vm.load_program(ast, module_file)
 
         # Override max_steps if specified in test
         if 'max_steps' in test_case:

@@ -1,6 +1,6 @@
 {
   "test_name": "Test low-pass filter",
-  "module_file": "examples/ex24_low_pass_filter.txt",
+  "module_file": "examples/control_systems/ex24_low_pass_filter.txt",
   "module_name": "low_pass_example",
   "parameters": {},
   "max_steps": 15,

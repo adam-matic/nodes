@@ -1,6 +1,6 @@
 {
   "test_name": "Test counter increments correctly",
-  "module_file": "examples/ex02_counter.txt",
+  "module_file": "examples/basic/ex02_counter.txt",
   "module_name": "counter",
   "parameters": {},
   "max_steps": 5,

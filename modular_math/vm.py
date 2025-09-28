@@ -124,37 +124,69 @@ class ModuleResolver:
 
     def __init__(self):
         self.loaded_modules: Dict[str, ModuleDefinition] = {}
-        self.module_search_paths = ['/storage/emulated/0/dev/examples']
+        self.module_search_paths = [
+            '/storage/emulated/0/dev/examples/basic',
+            '/storage/emulated/0/dev/examples/control_systems',
+            '/storage/emulated/0/dev/examples/advanced',
+            '/storage/emulated/0/dev/examples'  # fallback
+        ]
 
-    def load_module(self, module_name: str) -> ModuleDefinition:
-        """Load a module by name."""
+    def load_module(self, module_name: str, module_path: Optional[str] = None, base_dir: Optional[str] = None) -> ModuleDefinition:
+        """Load a module by name and optional explicit path."""
         if module_name in self.loaded_modules:
             return self.loaded_modules[module_name]
 
-        # Try to find and parse the module file
-        for search_path in self.module_search_paths:
-            module_file = f"{search_path}/{module_name}.txt"
-            try:
-                from .parser import parse_file
-                program = parse_file(module_file)
+        # If explicit path is provided, use it
+        if module_path:
+            import os
+            if not os.path.isabs(module_path):
+                # For relative paths, use base_dir if provided, otherwise current working context
+                if base_dir:
+                    module_file = os.path.join(base_dir, module_path)
+                else:
+                    module_file = os.path.join('/storage/emulated/0/dev', module_path)
+            else:
+                module_file = module_path
+        else:
+            # Try to find module in search paths (legacy behavior)
+            module_file = None
+            for search_path in self.module_search_paths:
+                candidate_file = f"{search_path}/{module_name}.txt"
+                try:
+                    with open(candidate_file, 'r'):
+                        module_file = candidate_file
+                        break
+                except FileNotFoundError:
+                    continue
 
-                # Find the module definition
-                for module in program.modules:
-                    if module.name == module_name:
-                        self.loaded_modules[module_name] = module
+            if not module_file:
+                raise ValueError(f"Module {module_name} not found in search paths")
 
-                        # Load any dependencies
-                        for import_stmt in program.imports:
+        try:
+            from .parser import parse_file
+            program = parse_file(module_file)
+
+            # Find the module definition
+            for module in program.modules:
+                if module.name == module_name:
+                    self.loaded_modules[module_name] = module
+
+                    # Load any dependencies - pass the directory context for relative imports
+                    import os
+                    current_dir = os.path.dirname(module_file)
+                    for import_stmt in program.imports:
+                        if import_stmt.module_path:
+                            # Pass the current directory as base for relative imports
+                            self.load_module(import_stmt.module_name, import_stmt.module_path, current_dir)
+                        else:
                             self.load_module(import_stmt.module_name)
 
-                        return module
+                    return module
 
-                raise ValueError(f"Module {module_name} not found in {module_file}")
+            raise ValueError(f"Module {module_name} not found in {module_file}")
 
-            except FileNotFoundError:
-                continue
-
-        raise ValueError(f"Module {module_name} not found in search paths")
+        except FileNotFoundError:
+            raise ValueError(f"Module file not found: {module_file}")
 
 
 class VirtualMachine:
@@ -175,7 +207,7 @@ class VirtualMachine:
         self.operation_order: List[int] = []  # Topologically sorted operation indices
         self.program_modules: Dict[str, ModuleDefinition] = {}  # Modules from current program
 
-    def load_program(self, program: Program):
+    def load_program(self, program: Program, source_file: Optional[str] = None):
         """Load a program AST into the VM."""
         self.signals.clear()
         self.operations.clear()
@@ -187,9 +219,18 @@ class VirtualMachine:
         for module in program.modules:
             self.program_modules[module.name] = module
 
-        # Load all imported modules
+        # Load all imported modules with proper base directory context
+        import os
+        if source_file:
+            base_dir = os.path.dirname(os.path.abspath(source_file))
+        else:
+            base_dir = os.getcwd()  # Default to current working directory
+
         for import_stmt in program.imports:
-            self.module_resolver.load_module(import_stmt.module_name)
+            if import_stmt.module_path:
+                self.module_resolver.load_module(import_stmt.module_name, import_stmt.module_path, base_dir)
+            else:
+                self.module_resolver.load_module(import_stmt.module_name)
 
         # Process execution block
         if program.execution:

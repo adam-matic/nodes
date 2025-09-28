@@ -1,6 +1,6 @@
 {
   "test_name": "Test HALT block at a specific step",
-  "module_file": "examples/ex05_halt_at_step.txt",
+  "module_file": "examples/basic/ex05_halt_at_step.txt",
   "module_name": "halt_at_step",
   "parameters": {
     "stop_step": 3

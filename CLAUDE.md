@@ -4,17 +4,27 @@ This project implements a domain-specific language (DSL) for describing and simu
 
 ## Project Structure
 
-- **`main.py`** - Command-line interface for parsing and running examples
-- **`tokenizer.py`** - Lexical analyzer that breaks source code into tokens
-- **`parser.py`** - Parser that builds an Abstract Syntax Tree (AST) from tokens
-- **`ast_nodes.py`** - Defines all AST node types and provides AST printing functionality
-- **`vm.py`** - Virtual machine that executes the parsed programs
-- **`test_runner.py`** - Test harness that runs all test cases
-- **`simulate.py`** - Simulation utilities
-- **`design_and_spec.txt`** - Complete language specification and design document
-- **`examples/`** - Collection of example programs (30+ examples)
-- **`tests/`** - Test cases with expected outputs
-- **`code/`** - Additional code samples
+- **`modular_math/`** - Core language implementation
+  - `tokenizer.py` - Lexical analyzer that breaks source code into tokens
+  - `parser.py` - Parser that builds an Abstract Syntax Tree (AST) from tokens
+  - `ast_nodes.py` - Defines all AST node types and provides AST printing functionality
+  - `vm.py` - Virtual machine that executes the parsed programs
+- **`cli/`** - Command-line interface
+  - `main.py` - Main entry point for parsing and running examples
+- **`web_interface/`** - Visual web interface
+  - `index.html` - Web-based visual node editor with drag-and-drop functionality
+  - `assets/` - CSS, JavaScript, and API integration files
+  - `server.py` - Optional Python backend server for real execution
+  - `README.md` - Detailed web interface documentation
+- **`examples/`** - Collection of example programs organized by complexity
+  - `basic/` - Simple arithmetic and basic language features
+  - `control_systems/` - PID controllers, filters, integrators
+  - `advanced/` - Signal generators, complex waveforms
+- **`tests/`** - Test cases and debugging scripts
+  - `debug_scripts/` - Development and debugging utilities
+- **`tools/`** - Utility scripts for development
+- **`docs/`** - Documentation
+  - `language_spec.md` - Complete language specification and design document
 
 ## Key Language Features
 
@@ -30,26 +40,45 @@ This project implements a domain-specific language (DSL) for describing and simu
 
 ```bash
 # Parse and run built-in examples
-python main.py --example simple
-python main.py --example counter
-python main.py --example addition
+python cli/main.py --example simple
+python cli/main.py --example counter
+python cli/main.py --example addition
 
 # Parse files from examples directory
-python main.py examples/ex01_addition.txt
+python cli/main.py examples/basic/ex01_addition.txt
 
 # Print AST for debugging
-python main.py --print-ast --example counter
+python cli/main.py --print-ast --example counter
 
 # Interactive mode
-python main.py
+python cli/main.py --interactive
 ```
 
 ## Testing
 
 Run all test cases:
 ```bash
-python test_runner.py
+python tests/test_runner.py
 ```
+
+## Web Interface
+
+The web interface provides a visual, drag-and-drop editor for building modular math programs with real Python execution:
+
+```bash
+# Start the backend server
+cd web_interface
+python server.py --port 8080
+# Then open http://localhost:8080 in browser
+```
+
+Features include:
+- **Visual node editor** with drag-and-drop functionality
+- **Real-time execution** using the Python VM
+- **Actual signal values** displayed on connections
+- **Touch support** for mobile devices
+- **Code editor** with syntax highlighting
+- **Live compilation** and error reporting
 
 ## Language Syntax Example
 
@@ -68,9 +97,10 @@ execution {
 
 ## Development Commands
 
-- **Parse files**: `python main.py <filename>`
-- **Run tests**: `python test_runner.py`
-- **VM simulation**: `python simulate.py` (if implemented)
-- **Interactive parsing**: `python main.py` (stdin mode)
+- **Parse files**: `python cli/main.py <filename>`
+- **Run tests**: `python tests/test_runner.py`
+- **VM simulation**: `python tests/simulate.py`
+- **Interactive parsing**: `python cli/main.py --interactive`
+- **Web interface**: `cd web_interface && python server.py` (then open http://localhost:8080)
 
 The language is designed for educational purposes and control system simulation, with a focus on clarity and mathematical modeling.

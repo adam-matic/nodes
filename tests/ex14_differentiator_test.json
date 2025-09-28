@@ -1,6 +1,6 @@
 {
   "test_name": "Test differentiator with step input",
-  "module_file": "examples/ex14_differentiator.txt",
+  "module_file": "examples/control_systems/ex14_differentiator.txt",
   "module_name": "differentiator_example",
   "parameters": {},
   "max_steps": 5,

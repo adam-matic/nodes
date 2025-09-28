@@ -1,6 +1,6 @@
 {
   "test_name": "Test range module",
-  "module_file": "examples/range.txt",
+  "module_file": "examples/advanced/range.txt",
   "module_name": "range",
   "parameters": {
     "start": 10,

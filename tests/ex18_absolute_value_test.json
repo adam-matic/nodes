@@ -1,6 +1,6 @@
 {
   "test_name": "Test absolute value",
-  "module_file": "examples/ex18_absolute_value.txt",
+  "module_file": "examples/advanced/ex18_absolute_value.txt",
   "module_name": "abs_example",
   "parameters": {},
   "max_steps": 11,

@@ -1,6 +1,6 @@
 {
   "test_name": "Test const module",
-  "module_file": "examples/const.txt",
+  "module_file": "examples/basic/const.txt",
   "module_name": "const",
   "parameters": {
     "value": 123

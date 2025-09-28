@@ -1,6 +1,6 @@
 {
   "test_name": "Test band-pass filter",
-  "module_file": "examples/ex26_band_pass_filter.txt",
+  "module_file": "examples/control_systems/ex26_band_pass_filter.txt",
   "module_name": "band_pass_example",
   "parameters": {},
   "max_steps": 10,

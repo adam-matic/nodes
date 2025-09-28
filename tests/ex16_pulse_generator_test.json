@@ -1,6 +1,6 @@
 {
   "test_name": "Test pulse generator at a specific time",
-  "module_file": "examples/ex16_pulse_generator.txt",
+  "module_file": "examples/advanced/ex16_pulse_generator.txt",
   "module_name": "pulse_generator",
   "parameters": {
     "pulse_time": 3

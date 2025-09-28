@@ -1,6 +1,6 @@
 {
   "test_name": "Test exponential decay",
-  "module_file": "examples/ex28_exponential_decay.txt",
+  "module_file": "examples/advanced/ex28_exponential_decay.txt",
   "module_name": "decay_example",
   "parameters": {
     "initial_value": 100,

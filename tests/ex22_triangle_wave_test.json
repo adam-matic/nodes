@@ -1,6 +1,6 @@
 {
   "test_name": "Test triangle wave generator",
-  "module_file": "examples/ex22_triangle_wave.txt",
+  "module_file": "examples/advanced/ex22_triangle_wave.txt",
   "module_name": "triangle_wave_example",
   "parameters": {
     "period": 20,

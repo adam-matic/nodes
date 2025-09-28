@@ -1,6 +1,6 @@
 {
   "test_name": "Test time module",
-  "module_file": "examples/time_example.txt",
+  "module_file": "examples/advanced/time_example.txt",
   "module_name": "time_module",
   "parameters": {
     "start": 0,

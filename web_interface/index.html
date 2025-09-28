@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modular Math Language - Visual Editor</title>
+    <link rel="stylesheet" href="assets/style.css">
+    <script src="assets/api.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="main-panel">
+            <div class="toolbar">
+                <button id="add-node-btn" class="btn btn-secondary">+ Add Node</button>
+                <button id="params-node-btn" class="btn btn-secondary" disabled>⚙ Parameters</button>
+                <button id="flip-node-btn" class="btn btn-secondary" disabled>↔ Flip Node</button>
+                <button id="delete-node-btn" class="btn btn-danger" disabled>🗑 Delete Node</button>
+                <div class="toolbar-separator"></div>
+                <label class="auto-compile-toggle">
+                    <input type="checkbox" id="auto-compile-checkbox" checked>
+                    <span>Auto-compile</span>
+                </label>
+                <button id="validate-btn" class="btn btn-secondary">🔍 Validate</button>
+            </div>
+
+            <div class="tabs">
+                <div class="tab active" data-tab="visual">Visual Editor</div>
+                <div class="tab" data-tab="code">Code Editor</div>
+                <div class="tab" data-tab="output">Output</div>
+            </div>
+
+            <div class="tab-content">
+                <!-- Visual Editor -->
+                <div id="visual-tab" class="node-editor">
+                    <div id="viewport" class="viewport">
+                        <svg id="connections" style="position: absolute; top: 0; left: 0; width: 5000px; height: 5000px; pointer-events: none; z-index: 1;">
+                            <!-- Connections will be drawn here -->
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Code Editor -->
+                <div id="code-tab" class="hidden">
+                    <textarea id="code-editor" class="code-editor">module counter {
+    // The counter's next value is its previous value plus one.
+    next_value = add(current_value, 1)
+
+    // The `mem` block provides the one-step delay needed for the feedback loop.
+    // It starts at 0.
+    current_value = mem(0, next_value)
+
+    output current_value
+}
+
+execution {
+    max_steps: 10
+    save: [current_value]
+}</textarea>
+                </div>
+
+                <!-- Output Tab -->
+                <div id="output-tab" class="hidden">
+                    <div class="output-panel">
+                        <div class="output-controls">
+                            <button id="compile-btn" class="btn btn-secondary">Compile</button>
+                            <button id="run-btn" class="btn btn-primary">Run</button>
+                            <button id="step-btn" class="btn btn-secondary">Step</button>
+                            <button id="reset-btn" class="btn btn-danger">Reset</button>
+                            <button id="clear-output-btn" class="btn btn-secondary">Clear</button>
+                            <button id="copy-output-btn" class="btn btn-secondary">Copy All</button>
+                            <span id="step-counter" class="step-counter">Step: 0</span>
+                            <span id="connection-status" class="connection-status">Connecting...</span>
+                        </div>
+                        <div id="output" class="output-content">Ready to execute...\n</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Context menu for adding nodes -->
+    <div id="node-menu" class="node-menu hidden">
+        <a href="#" class="node-menu-item" data-type="add">add</a>
+        <a href="#" class="node-menu-item" data-type="sub">sub</a>
+        <a href="#" class="node-menu-item" data-type="mul">mul</a>
+        <a href="#" class="node-menu-item" data-type="div">div</a>
+        <a href="#" class="node-menu-item" data-type="mem">mem</a>
+        <a href="#" class="node-menu-item" data-type="const">const</a>
+        <a href="#" class="node-menu-item" data-type="gt">gt</a>
+        <a href="#" class="node-menu-item" data-type="lt">lt</a>
+        <a href="#" class="node-menu-item" data-type="eq">eq</a>
+        <a href="#" class="node-menu-item" data-type="input">input</a>
+        <a href="#" class="node-menu-item" data-type="output">output</a>
+    </div>
+
+    <!-- Parameter panel -->
+    <div id="parameter-panel" class="parameter-panel hidden">
+        <div class="parameter-header">
+            <h3 id="parameter-title">Node Parameters</h3>
+            <button id="close-params-btn" class="close-btn">×</button>
+        </div>
+        <div id="parameter-content" class="parameter-content">
+            <!-- Dynamic content will be inserted here -->
+        </div>
+        <div class="parameter-footer">
+            <button id="save-params-btn" class="btn btn-primary">Save</button>
+            <button id="cancel-params-btn" class="btn btn-secondary">Cancel</button>
+        </div>
+    </div>
+
+    <script src="assets/app.js"></script>
+</body>
+</html>

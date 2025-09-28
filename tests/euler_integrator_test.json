@@ -1,6 +1,6 @@
 {
   "test_name": "Test Euler integrator with a ramp input",
-  "module_file": "examples/euler_integrator.txt",
+  "module_file": "examples/control_systems/euler_integrator.txt",
   "module_name": "euler_integrator",
   "parameters": {
     "signal": "$step",
