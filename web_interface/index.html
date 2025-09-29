@@ -11,16 +11,19 @@
     <div class="container">
         <div class="main-panel">
             <div class="toolbar">
-                <button id="add-node-btn" class="btn btn-secondary">+ Add Node</button>
-                <button id="params-node-btn" class="btn btn-secondary" disabled>⚙ Parameters</button>
-                <button id="flip-node-btn" class="btn btn-secondary" disabled>↔ Flip Node</button>
-                <button id="delete-node-btn" class="btn btn-danger" disabled>🗑 Delete Node</button>
-                <div class="toolbar-separator"></div>
-                <label class="auto-compile-toggle">
-                    <input type="checkbox" id="auto-compile-checkbox" checked>
-                    <span>Auto-compile</span>
-                </label>
-                <button id="validate-btn" class="btn btn-secondary">🔍 Validate</button>
+                <div class="toolbar-row">
+                    <button id="add-node-btn" class="btn btn-secondary">+ Add Node</button>
+                    <button id="params-node-btn" class="btn btn-secondary" disabled>⚙ Parameters</button>
+                    <button id="flip-node-btn" class="btn btn-secondary" disabled>↔ Flip Node</button>
+                    <button id="delete-btn" class="btn btn-danger" disabled>🗑 Delete</button>
+                </div>
+                <div class="toolbar-row">
+                    <label class="auto-compile-toggle">
+                        <input type="checkbox" id="auto-compile-checkbox" checked>
+                        <span>Auto-compile</span>
+                    </label>
+                    <button id="validate-btn" class="btn btn-secondary">🔍 Validate</button>
+                </div>
             </div>
 
             <div class="tabs">

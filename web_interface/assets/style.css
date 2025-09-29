@@ -33,12 +33,18 @@ body {
 
 .toolbar {
     display: flex;
+    flex-direction: column;
     background: #f5f5f5;
     border-bottom: 1px solid #ccc;
     padding: 8px 12px;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.toolbar-row {
+    display: flex;
     gap: 10px;
     align-items: center;
-    flex-shrink: 0;
 }
 
 .toolbar-separator {
@@ -183,7 +189,6 @@ body {
 
 /* Connection deletion styles */
 .connection-line {
-    stroke-width: 3px;
     transition: stroke-width 0.2s ease, stroke 0.2s ease;
 }
 
@@ -197,6 +202,19 @@ body {
     stroke: #2196f3 !important;
     stroke-dasharray: 5,5;
     animation: dash 1s linear infinite;
+}
+
+/* Touch device overrides for hover and selection */
+@media (pointer: coarse) {
+    .connection-line:hover {
+        stroke-width: 10px;
+        stroke: #ff4444 !important;
+    }
+
+    .connection-line.selected {
+        stroke-width: 9px;
+        stroke: #2196f3 !important;
+    }
 }
 
 @keyframes dash {
@@ -217,13 +235,28 @@ body {
 }
 
 .connection-menu-item {
-    padding: 8px 12px;
+    padding: 12px 16px;
     cursor: pointer;
-    font-size: 13px;
+    font-size: 14px;
     display: flex;
     align-items: center;
     gap: 8px;
     transition: background-color 0.2s ease;
+    min-height: 44px; /* Minimum touch target size for accessibility */
+    user-select: none;
+}
+
+/* Larger touch targets for mobile devices */
+@media (pointer: coarse) {
+    .connection-menu-item {
+        padding: 16px 20px;
+        font-size: 16px;
+        min-height: 48px;
+    }
+
+    .connection-menu {
+        min-width: 180px;
+    }
 }
 
 .connection-menu-item:hover {
@@ -335,6 +368,51 @@ body {
     stroke: #666;
     stroke-width: 3;
     fill: none;
+    /* Make connections interactive for touch devices */
+    pointer-events: stroke;
+    cursor: pointer;
+}
+
+/* Touch areas for better targeting */
+.connection-touch-area {
+    stroke: transparent;
+    stroke-width: 20;
+    fill: none;
+    pointer-events: stroke;
+    cursor: pointer;
+}
+
+/* Debug mode - uncomment to visualize touch areas */
+/*
+.connection-touch-area {
+    stroke: rgba(255, 0, 0, 0.2) !important;
+}
+*/
+
+/* Larger stroke width for touch devices to improve tap targeting */
+@media (pointer: coarse) {
+    .connection-line {
+        stroke-width: 8;
+    }
+
+    .connection-line:hover {
+        stroke-width: 10px;
+    }
+
+    .connection-line.selected {
+        stroke-width: 9px;
+    }
+
+    /* Even wider touch areas on touch devices */
+    .connection-touch-area {
+        stroke-width: 30;
+    }
+
+    /* Add visual feedback on touch */
+    .connection-line:active {
+        stroke: #2196f3 !important;
+        stroke-width: 12px;
+    }
 }
 
 .connection.active .connection-line {

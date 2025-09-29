@@ -73,7 +73,7 @@ class NodeEditor {
         document.getElementById('add-node-btn').addEventListener('click', (e) => this.showNodeMenuFromButton(e));
         document.getElementById('params-node-btn').addEventListener('click', () => this.showParameterPanel());
         document.getElementById('flip-node-btn').addEventListener('click', () => this.flipSelectedNode());
-        document.getElementById('delete-node-btn').addEventListener('click', () => this.deleteSelectedNode());
+        document.getElementById('delete-btn').addEventListener('click', () => this.deleteSelected());
 
         // Parameter panel controls
         document.getElementById('close-params-btn').addEventListener('click', () => this.hideParameterPanel());
@@ -156,7 +156,7 @@ class NodeEditor {
 
             // Enable toolbar buttons based on node capabilities
             document.getElementById('flip-node-btn').disabled = false;
-            document.getElementById('delete-node-btn').disabled = false;
+            document.getElementById('delete-btn').disabled = false;
 
             // Enable parameters button only if node has parameters
             if (nodeData && this.nodeHasParameters(nodeData.type)) {
@@ -168,7 +168,7 @@ class NodeEditor {
             // Disable all toolbar buttons
             document.getElementById('params-node-btn').disabled = true;
             document.getElementById('flip-node-btn').disabled = true;
-            document.getElementById('delete-node-btn').disabled = true;
+            document.getElementById('delete-btn').disabled = true;
         }
     }
 
@@ -177,10 +177,41 @@ class NodeEditor {
             this.selectedNodeForHighlight.classList.remove('selected');
             this.selectedNodeForHighlight = null;
         }
+
+        // Clear connection selection
+        if (this.selectedConnection) {
+            this.selectedConnection.pathElement.classList.remove('selected');
+            if (this.selectedConnection.touchArea) {
+                this.selectedConnection.touchArea.classList.remove('selected');
+            }
+            this.selectedConnection = null;
+        }
+
         // Disable toolbar buttons when no selection
         document.getElementById('params-node-btn').disabled = true;
         document.getElementById('flip-node-btn').disabled = true;
-        document.getElementById('delete-node-btn').disabled = true;
+        document.getElementById('delete-btn').disabled = true;
+    }
+
+    deleteSelected() {
+        // Check if a connection is selected
+        if (this.selectedConnection) {
+            console.log('Deleting selected connection:', this.selectedConnection); // Debug log
+            this.deleteConnection(this.selectedConnection);
+            this.selectedConnection = null;
+            // Disable delete button after deletion
+            document.getElementById('delete-btn').disabled = true;
+            return;
+        }
+
+        // Check if a node is selected
+        if (this.selectedNodeForHighlight) {
+            console.log('Deleting selected node:', this.selectedNodeForHighlight); // Debug log
+            this.deleteSelectedNode();
+            return;
+        }
+
+        console.log('No selection to delete'); // Debug log
     }
 
     deleteSelectedNode() {
@@ -210,7 +241,7 @@ class NodeEditor {
         this.selectedNodeForHighlight = null;
         document.getElementById('params-node-btn').disabled = true;
         document.getElementById('flip-node-btn').disabled = true;
-        document.getElementById('delete-node-btn').disabled = true;
+        document.getElementById('delete-btn').disabled = true;
 
         // Trigger validation and auto-compilation
         this.scheduleAutoCompile();
@@ -856,28 +887,71 @@ class NodeEditor {
         pathElement.classList.add('connection-line');
         pathElement.dataset.connectionId = connection.id;
 
-        // Make connection lines interactive for deletion
-        pathElement.style.cursor = 'pointer';
-        pathElement.addEventListener('click', (e) => this.onConnectionClick(e, connection));
-        pathElement.addEventListener('contextmenu', (e) => this.onConnectionRightClick(e, connection));
+        // Create invisible wider touch area for better touch targeting
+        const touchArea = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        touchArea.classList.add('connection-touch-area');
+        touchArea.dataset.connectionId = connection.id;
+        touchArea.style.stroke = 'transparent';
+        touchArea.style.strokeWidth = '20'; // Much wider invisible touch area
+        touchArea.style.fill = 'none';
+        touchArea.style.cursor = 'pointer';
+        touchArea.style.pointerEvents = 'stroke';
 
-        // Touch support for mobile devices
-        let touchStartTime = 0;
-        pathElement.addEventListener('touchstart', (e) => {
-            touchStartTime = Date.now();
-        });
-        pathElement.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            const touchDuration = Date.now() - touchStartTime;
+        // Add event listeners to both the touch area and visible path
+        const addConnectionEvents = (element) => {
+            element.addEventListener('click', (e) => this.onConnectionClick(e, connection));
+            element.addEventListener('contextmenu', (e) => this.onConnectionRightClick(e, connection));
 
-            if (touchDuration > 500) {
-                // Long press - show context menu
-                this.showConnectionContextMenu(e.changedTouches[0], connection);
-            } else {
-                // Short tap - delete with confirmation
-                this.onConnectionClick(e, connection);
-            }
-        });
+            // Touch support for mobile devices
+            let touchStartTime = 0;
+            let touchStartPos = { x: 0, y: 0 };
+            let hasMoved = false;
+
+            element.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                touchStartTime = Date.now();
+                const touch = e.touches[0];
+                touchStartPos = { x: touch.clientX, y: touch.clientY };
+                hasMoved = false;
+            }, { passive: false });
+
+            element.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const dx = Math.abs(touch.clientX - touchStartPos.x);
+                const dy = Math.abs(touch.clientY - touchStartPos.y);
+
+                // If finger moved more than 10px, consider it a move gesture
+                if (dx > 10 || dy > 10) {
+                    hasMoved = true;
+                }
+            }, { passive: false });
+
+            element.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                // Don't process if the touch moved (was likely a pan/scroll gesture)
+                if (hasMoved) {
+                    return;
+                }
+
+                const touchDuration = Date.now() - touchStartTime;
+                const touch = e.changedTouches[0];
+
+                if (touchDuration > 500) {
+                    // Long press - show context menu
+                    this.showConnectionContextMenu(touch, connection);
+                } else {
+                    // Short tap - select and optionally delete
+                    this.onConnectionClick(e, connection);
+                }
+            }, { passive: false });
+        };
+
+        // Apply events to both visible line and invisible touch area
+        addConnectionEvents(pathElement);
+        addConnectionEvents(touchArea);
 
         const textElement = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         textElement.classList.add('connection-value');
@@ -885,11 +959,13 @@ class NodeEditor {
 
         const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
         group.classList.add('connection');
+        group.appendChild(touchArea); // Add invisible touch area first (behind visible line)
         group.appendChild(pathElement);
         group.appendChild(textElement);
 
         connection.element = group;
         connection.pathElement = pathElement;
+        connection.touchArea = touchArea;
         connection.textElement = textElement;
 
         this.connections.push(connection);
@@ -948,6 +1024,11 @@ class NodeEditor {
 
         const path = this.createConnectionPath(startX, startY, endX, endY);
         connection.pathElement.setAttribute('d', path);
+
+        // Update the invisible touch area with the same path
+        if (connection.touchArea) {
+            connection.touchArea.setAttribute('d', path);
+        }
 
         // Position value text at midpoint
         const midX = (startX + endX) / 2;
@@ -1428,7 +1509,7 @@ class NodeEditor {
                 const value = nodeData.parameters.value || 1;
                 // Ensure the value is a valid number
                 const numValue = isNaN(value) ? 1 : Number(value);
-                code += `    ${varName} = const(${numValue})\n`;
+                code += `    ${varName} = const(value=${numValue})\n`;
                 addedVariables.add(varName);
                 return;
             }
@@ -1619,16 +1700,24 @@ class NodeEditor {
         e.stopPropagation();
         e.preventDefault();
 
-        // Select the connection first
+        // Provide haptic feedback on touch devices
+        if ('vibrate' in navigator) {
+            navigator.vibrate(50); // Brief vibration for feedback
+        }
+
+        // Clear node selection first (but preserve connection selection)
+        if (this.selectedNodeForHighlight) {
+            this.selectedNodeForHighlight.classList.remove('selected');
+            this.selectedNodeForHighlight = null;
+        }
+
+        // Select the connection
         this.selectConnection(connection);
 
-        // Clear node selection when clicking on connection
-        this.clearSelection();
-
-        // Show confirmation for deletion
-        if (confirm('Delete this connection?')) {
-            this.deleteConnection(connection);
-        }
+        // Disable node-specific buttons, enable delete button
+        document.getElementById('params-node-btn').disabled = true;
+        document.getElementById('flip-node-btn').disabled = true;
+        document.getElementById('delete-btn').disabled = false;
     }
 
     onConnectionRightClick(e, connection) {
@@ -1671,12 +1760,31 @@ class NodeEditor {
             <div class="connection-menu-item" data-action="info">ℹ Connection Info</div>
         `;
 
-        // Position menu at mouse location
-        menu.style.left = e.clientX + 'px';
-        menu.style.top = e.clientY + 'px';
+        // Position menu at touch/mouse location
+        const clientX = e.clientX || e.pageX || 0;
+        const clientY = e.clientY || e.pageY || 0;
+
+        menu.style.left = clientX + 'px';
+        menu.style.top = clientY + 'px';
+        menu.style.position = 'fixed';
+        menu.style.zIndex = '10000';
 
         // Add to document
         document.body.appendChild(menu);
+
+        // Ensure menu stays within viewport
+        setTimeout(() => {
+            const menuRect = menu.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+
+            if (menuRect.right > viewportWidth) {
+                menu.style.left = (clientX - menuRect.width) + 'px';
+            }
+            if (menuRect.bottom > viewportHeight) {
+                menu.style.top = (clientY - menuRect.height) + 'px';
+            }
+        }, 0);
 
         // Add event listeners
         menu.addEventListener('click', (menuE) => {
@@ -1689,16 +1797,30 @@ class NodeEditor {
             menu.remove();
         });
 
-        // Remove menu when clicking elsewhere
+        // Add touch event listeners for mobile
+        menu.addEventListener('touchend', (menuE) => {
+            menuE.preventDefault();
+            const action = menuE.target.dataset.action;
+            if (action === 'delete') {
+                this.deleteConnection(connection);
+            } else if (action === 'info') {
+                this.showConnectionInfo(connection);
+            }
+            menu.remove();
+        });
+
+        // Remove menu when clicking/touching elsewhere
         const removeMenu = (event) => {
             if (!menu.contains(event.target)) {
                 menu.remove();
                 document.removeEventListener('click', removeMenu);
+                document.removeEventListener('touchstart', removeMenu);
             }
         };
 
         setTimeout(() => {
             document.addEventListener('click', removeMenu);
+            document.addEventListener('touchstart', removeMenu);
         }, 10);
     }
 
@@ -1715,15 +1837,37 @@ Current Value: ${connection.value || 'none'}`;
     }
 
     selectConnection(connection) {
+        console.log('Selecting connection:', connection); // Debug log
+
         // Clear previous connection selection
         if (this.selectedConnection) {
             this.selectedConnection.pathElement.classList.remove('selected');
+            if (this.selectedConnection.touchArea) {
+                this.selectedConnection.touchArea.classList.remove('selected');
+            }
         }
 
         // Select new connection
         this.selectedConnection = connection;
         if (connection) {
+            console.log('Connection selected successfully'); // Debug log
             connection.pathElement.classList.add('selected');
+            // Also apply selection style to touch area for consistency
+            if (connection.touchArea) {
+                connection.touchArea.classList.add('selected');
+            }
+
+            // Provide immediate visual feedback
+            connection.pathElement.style.stroke = '#2196f3';
+            connection.pathElement.style.strokeWidth = '6px';
+
+            // Reset visual feedback after a moment
+            setTimeout(() => {
+                if (connection.pathElement.classList.contains('selected')) {
+                    connection.pathElement.style.stroke = '';
+                    connection.pathElement.style.strokeWidth = '';
+                }
+            }, 200);
         }
     }
 
@@ -1731,22 +1875,12 @@ Current Value: ${connection.value || 'none'}`;
         // Delete key - delete selected node or connection
         if (e.key === 'Delete' || e.key === 'Backspace') {
             e.preventDefault();
-
-            if (this.selectedConnection) {
-                this.deleteConnection(this.selectedConnection);
-                this.selectedConnection = null;
-            } else if (this.selectedNodeForHighlight) {
-                this.deleteSelectedNode();
-            }
+            this.deleteSelected();
         }
 
         // Escape key - clear selections
         if (e.key === 'Escape') {
             this.clearSelection();
-            if (this.selectedConnection) {
-                this.selectedConnection.pathElement.classList.remove('selected');
-                this.selectedConnection = null;
-            }
         }
     }
 }
