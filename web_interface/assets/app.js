@@ -34,6 +34,9 @@ class NodeEditor {
         this.validationErrors = [];
         this.autoCompileEnabled = true;
         this.compileTimeout = null;
+
+        // Variable table tracking
+        this.variableTableInitialized = false;
     }
 
     setupEventListeners() {
@@ -89,6 +92,11 @@ class NodeEditor {
         });
         document.getElementById('validate-btn').addEventListener('click', () => this.performManualValidation());
 
+        // Max steps control
+        document.getElementById('max-steps-input').addEventListener('input', () => {
+            this.scheduleAutoCompile();
+        });
+
         // Execution controls
         document.getElementById('compile-btn').addEventListener('click', () => this.compileCode());
         document.getElementById('run-btn').addEventListener('click', () => this.toggleRun());
@@ -96,6 +104,11 @@ class NodeEditor {
         document.getElementById('reset-btn').addEventListener('click', () => this.reset());
         document.getElementById('clear-output-btn').addEventListener('click', () => this.clearOutput());
         document.getElementById('copy-output-btn').addEventListener('click', () => this.copyOutput());
+
+        // Toolbar execution controls (same functionality as output tab)
+        document.getElementById('toolbar-run-btn').addEventListener('click', () => this.toggleRun());
+        document.getElementById('toolbar-step-btn').addEventListener('click', () => this.executeStep());
+        document.getElementById('toolbar-reset-btn').addEventListener('click', () => this.reset());
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => this.onKeyDown(e));
@@ -1081,6 +1094,9 @@ class NodeEditor {
         const codeEditor = document.getElementById('code-editor');
         const code = codeEditor.value;
 
+        // Reset variable table flag for new compilation
+        this.variableTableInitialized = false;
+
         this.addOutput('Compiling code...\n');
 
         try {
@@ -1090,6 +1106,11 @@ class NodeEditor {
                 this.addOutput(`✓ ${result.message}\n`);
                 if (result.max_steps) {
                     this.maxSteps = result.max_steps;
+                    // Update the UI input to reflect the compiled max_steps value
+                    const maxStepsInput = document.getElementById('max-steps-input');
+                    if (maxStepsInput && parseInt(maxStepsInput.value) !== result.max_steps) {
+                        maxStepsInput.value = result.max_steps;
+                    }
                 }
             } else {
                 this.addOutput(`✗ ${result.message}\n`);
@@ -1114,11 +1135,15 @@ class NodeEditor {
             if (result.success) {
                 this.isRunning = true;
                 document.getElementById('run-btn').textContent = 'Stop';
+                document.getElementById('toolbar-run-btn').textContent = 'Stop';
                 this.addOutput('Starting execution...\n');
 
                 this.executionInterval = setInterval(async () => {
                     await this.executeStep();
-                    if (this.currentStep >= (this.maxSteps || 10)) {
+                    // Get current max_steps value from the UI
+                    const maxStepsInput = document.getElementById('max-steps-input');
+                    const currentMaxSteps = maxStepsInput ? parseInt(maxStepsInput.value) || 10 : 10;
+                    if (this.currentStep >= currentMaxSteps) {
                         this.stopExecution();
                     }
                 }, 500);
@@ -1133,6 +1158,7 @@ class NodeEditor {
     stopExecution() {
         this.isRunning = false;
         document.getElementById('run-btn').textContent = 'Run';
+        document.getElementById('toolbar-run-btn').textContent = 'Run';
         if (this.executionInterval) {
             clearInterval(this.executionInterval);
             this.executionInterval = null;
@@ -1147,13 +1173,16 @@ class NodeEditor {
             if (result.success) {
                 this.currentStep = result.step || (this.currentStep + 1);
                 document.getElementById('step-counter').textContent = `Step: ${this.currentStep}`;
+                document.getElementById('toolbar-step-counter').textContent = `Step: ${this.currentStep}`;
 
                 // Update connection values with real data from server
                 if (result.signals) {
                     this.updateConnectionValues(result.signals);
+                    // Show variable values in columnar format
+                    this.addVariableOutput(this.currentStep, result.signals);
+                } else {
+                    this.addOutput(`Step ${this.currentStep} executed\n`);
                 }
-
-                this.addOutput(`Step ${this.currentStep} executed\n`);
             } else {
                 this.addOutput(`✗ ${result.message}\n`);
                 if (this.isRunning) {
@@ -1203,7 +1232,11 @@ class NodeEditor {
 
             this.currentStep = 0;
             document.getElementById('step-counter').textContent = 'Step: 0';
+            document.getElementById('toolbar-step-counter').textContent = 'Step: 0';
             document.getElementById('output').textContent = 'Ready to execute...\n';
+
+            // Reset variable table flag
+            this.variableTableInitialized = false;
 
             // Clear connection values
             this.connections.forEach(conn => {
@@ -1241,6 +1274,80 @@ class NodeEditor {
         if (this.isRunning && text.includes('Starting execution')) {
             this.switchTab('output');
         }
+    }
+
+    addVariableOutput(step, signals) {
+        // Initialize column headers if this is the first step (step 0 or 1)
+        if (step <= 1 && !this.variableTableInitialized) {
+            this.initializeVariableTable(signals);
+            this.variableTableInitialized = true;
+        }
+
+        // Format variable values in columns (filter out internal variables)
+        const variableNames = Object.keys(signals)
+            .filter(name => !name.startsWith('_temp_') && !name.startsWith('$'))
+            .sort();
+        let line = `${step.toString().padStart(4)} |`;
+
+        variableNames.forEach(varName => {
+            const value = signals[varName];
+            const formattedValue = this.formatValue(value);
+            line += ` ${formattedValue.padStart(8)} |`;
+        });
+
+        this.addOutput(line + '\n');
+    }
+
+    initializeVariableTable(signals) {
+        const variableNames = Object.keys(signals)
+            .filter(name => !name.startsWith('_temp_') && !name.startsWith('$'))
+            .sort();
+
+        // Add header
+        this.addOutput('\n=== Variable Values ===\n');
+
+        // Add column headers
+        let headerLine = 'Step |';
+        variableNames.forEach(varName => {
+            const shortName = this.shortenVariableName(varName);
+            headerLine += ` ${shortName.padStart(8)} |`;
+        });
+        this.addOutput(headerLine + '\n');
+
+        // Add separator line
+        let separatorLine = '-----+';
+        variableNames.forEach(() => {
+            separatorLine += '---------+';
+        });
+        this.addOutput(separatorLine + '\n');
+    }
+
+    shortenVariableName(varName) {
+        // Shorten variable names to fit in 8 characters
+        if (varName.length <= 8) return varName;
+
+        // Try to keep meaningful parts
+        if (varName.includes('_')) {
+            const parts = varName.split('_');
+            if (parts.length >= 2) {
+                return parts[0].substr(0, 4) + '_' + parts[1].substr(0, 2);
+            }
+        }
+
+        return varName.substr(0, 8);
+    }
+
+    formatValue(value) {
+        if (value === null || value === undefined) return 'null';
+        if (typeof value === 'number') {
+            // Format numbers to 2 decimal places, or as integer if whole number
+            if (Number.isInteger(value)) {
+                return value.toString();
+            } else {
+                return value.toFixed(2);
+            }
+        }
+        return value.toString().substr(0, 8);
     }
 
     clearOutput() {
@@ -1549,7 +1656,11 @@ class NodeEditor {
 
         code += '}\n\n';
         code += 'execution {\n';
-        code += '    max_steps: 10\n';
+
+        // Get max_steps value from the UI input
+        const maxStepsInput = document.getElementById('max-steps-input');
+        const maxSteps = maxStepsInput ? parseInt(maxStepsInput.value) || 10 : 10;
+        code += `    max_steps: ${maxSteps}\n`;
 
         // Add save variables for outputs
         const outputVariables = [];

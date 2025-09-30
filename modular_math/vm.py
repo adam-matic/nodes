@@ -624,7 +624,6 @@ class VirtualMachine:
 
         while self.current_step < self.max_steps and not self.halted:
             self.step()
-            self.current_step += 1
 
         return self.get_results()
 
@@ -659,6 +658,14 @@ class VirtualMachine:
 
         # Set halt flag after all operations are complete
         if halt_triggered:
+            self.halted = True
+
+        # Increment step counter for next iteration
+        if not self.halted and self.current_step < self.max_steps:
+            self.current_step += 1
+
+        # Check if we've reached max_steps
+        if self.current_step >= self.max_steps:
             self.halted = True
 
     def get_results(self) -> Dict[str, List[float]]:

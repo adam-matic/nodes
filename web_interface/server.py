@@ -307,12 +307,13 @@ class ModularMathHandler(BaseHTTPRequestHandler):
         signals = {}
 
         try:
-            # Extract current signal values from VM
-            current_step = vm.current_step
+            # Extract signal values from the step we just executed
+            # (current_step was incremented after execution, so we need step - 1)
+            executed_step = max(0, vm.current_step - 1)
 
             for signal_name, signal in vm.signals.items():
-                # Get the current value for this step
-                value = signal.get_value(current_step)
+                # Get the value for the step we just executed
+                value = signal.get_value(executed_step)
                 signals[signal_name] = value
 
         except Exception as e:
