@@ -54,6 +54,7 @@ class ModularMathHandler(BaseHTTPRequestHandler):
         """Handle GET requests"""
         parsed_path = urlparse(self.path)
         path = parsed_path.path
+        query = parse_qs(parsed_path.query)
 
         if path == '/' or path == '/index.html':
             self.serve_file('index.html')
@@ -65,6 +66,11 @@ class ModularMathHandler(BaseHTTPRequestHandler):
             self.get_status()
         elif path == '/api/signals':
             self.get_signals()
+        elif path == '/api/load_graph':
+            filename = query.get('file', [''])[0]
+            self.load_graph(filename)
+        elif path == '/api/list_graphs':
+            self.list_graphs()
         else:
             self.send_error(404, "File not found")
 
@@ -85,6 +91,8 @@ class ModularMathHandler(BaseHTTPRequestHandler):
             self.step_program()
         elif path == '/api/reset':
             self.reset_program()
+        elif path == '/api/save_graph':
+            self.save_graph(post_data)
         else:
             self.send_error(404, "Endpoint not found")
 
@@ -205,6 +213,7 @@ class ModularMathHandler(BaseHTTPRequestHandler):
     def step_program(self):
         """Execute one step of the program"""
         state = ModularMathHandler._execution_state
+        print(f"[SERVER] Step called - current_step before: {state['current_step']}")
 
         if not state.get('compiled') or not state['vm'] or not state['program']:
             response = {
@@ -228,10 +237,13 @@ class ModularMathHandler(BaseHTTPRequestHandler):
 
             # Update state with VM's current step
             if 'step' in result:
+                print(f"[SERVER] VM returned step: {result['step']}")
                 state['current_step'] = result['step']
             else:
                 state['current_step'] += 1
+                print(f"[SERVER] No step in result, incremented to: {state['current_step']}")
 
+            print(f"[SERVER] Sending response with step: {state['current_step']}")
             response = {
                 'success': True,
                 'message': f'Step {state["current_step"]} executed',
@@ -326,6 +338,7 @@ class ModularMathHandler(BaseHTTPRequestHandler):
     def reset_program(self):
         """Reset the execution state"""
         state = ModularMathHandler._execution_state
+        print(f"[SERVER] Reset called - current_step was {state['current_step']}")
         state['current_step'] = 0
         state['is_running'] = False
         state['signals'] = {}
@@ -333,11 +346,16 @@ class ModularMathHandler(BaseHTTPRequestHandler):
 
         # Reset VM if it has a reset method
         if state['vm'] and hasattr(state['vm'], 'reset'):
+            print(f"[SERVER] VM exists and has reset method, calling it...")
             try:
                 state['vm'].reset()
-            except:
-                pass
+                print(f"[SERVER] VM reset successful")
+            except Exception as e:
+                print(f"[SERVER] VM reset failed: {e}")
+        else:
+            print(f"[SERVER] VM is None or doesn't have reset method. VM={state['vm']}, has_reset={hasattr(state['vm'], 'reset') if state['vm'] else False}")
 
+        print(f"[SERVER] Reset complete - sending response with step=0")
         response = {
             'success': True,
             'message': 'Execution reset',
@@ -381,6 +399,113 @@ class ModularMathHandler(BaseHTTPRequestHandler):
         self.send_header('Cache-Control', 'no-cache')
         self.end_headers()
         self.wfile.write(json_data.encode('utf-8'))
+
+    def save_graph(self, graph_json):
+        """Save a graph to the server filesystem"""
+        try:
+            data = json.loads(graph_json)
+            graph_data = data.get('graphData', {})
+            filename = data.get('filename', 'untitled.mmgraph')
+
+            # Ensure filename has correct extension
+            if not filename.endswith('.mmgraph'):
+                filename += '.mmgraph'
+
+            # Create saved_graphs directory if it doesn't exist
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            saved_graphs_dir = os.path.join(current_dir, 'saved_graphs')
+            os.makedirs(saved_graphs_dir, exist_ok=True)
+
+            # Write graph file
+            file_path = os.path.join(saved_graphs_dir, filename)
+            with open(file_path, 'w') as f:
+                json.dump(graph_data, f, indent=2)
+
+            response = {
+                'success': True,
+                'message': f'Graph saved successfully as {filename}',
+                'filename': filename,
+                'path': file_path
+            }
+            self.send_json_response(response)
+
+        except Exception as e:
+            response = {
+                'success': False,
+                'message': f'Error saving graph: {str(e)}'
+            }
+            self.send_json_response(response, 500)
+
+    def load_graph(self, filename):
+        """Load a graph from the server filesystem"""
+        try:
+            if not filename:
+                raise ValueError("No filename provided")
+
+            # Security: prevent directory traversal
+            filename = os.path.basename(filename)
+
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            saved_graphs_dir = os.path.join(current_dir, 'saved_graphs')
+            file_path = os.path.join(saved_graphs_dir, filename)
+
+            if not os.path.exists(file_path):
+                raise FileNotFoundError(f"Graph file not found: {filename}")
+
+            # Read graph file
+            with open(file_path, 'r') as f:
+                graph_data = json.load(f)
+
+            response = {
+                'success': True,
+                'message': f'Graph loaded successfully: {filename}',
+                'graphData': graph_data
+            }
+            self.send_json_response(response)
+
+        except Exception as e:
+            response = {
+                'success': False,
+                'message': f'Error loading graph: {str(e)}'
+            }
+            self.send_json_response(response, 404)
+
+    def list_graphs(self):
+        """List all saved graphs"""
+        try:
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            saved_graphs_dir = os.path.join(current_dir, 'saved_graphs')
+
+            # Create directory if it doesn't exist
+            os.makedirs(saved_graphs_dir, exist_ok=True)
+
+            # List all .mmgraph files
+            files = []
+            for filename in os.listdir(saved_graphs_dir):
+                if filename.endswith('.mmgraph'):
+                    file_path = os.path.join(saved_graphs_dir, filename)
+                    stat = os.stat(file_path)
+                    files.append({
+                        'filename': filename,
+                        'size': stat.st_size,
+                        'modified': stat.st_mtime
+                    })
+
+            # Sort by modification time (newest first)
+            files.sort(key=lambda x: x['modified'], reverse=True)
+
+            response = {
+                'success': True,
+                'files': files
+            }
+            self.send_json_response(response)
+
+        except Exception as e:
+            response = {
+                'success': False,
+                'message': f'Error listing graphs: {str(e)}'
+            }
+            self.send_json_response(response, 500)
 
     def log_message(self, format, *args):
         """Override to reduce logging noise"""

@@ -379,6 +379,55 @@ body {
     color: #d32f2f;
 }
 
+.node-context-menu {
+    position: fixed;
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    z-index: 2000;
+    padding: 4px 0;
+    min-width: 180px;
+}
+
+.node-context-menu-item {
+    padding: 12px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background-color 0.2s ease;
+    min-height: 44px;
+    user-select: none;
+}
+
+/* Larger touch targets for mobile devices */
+@media (pointer: coarse) {
+    .node-context-menu-item {
+        padding: 16px 20px;
+        font-size: 16px;
+        min-height: 48px;
+    }
+
+    .node-context-menu {
+        min-width: 200px;
+    }
+}
+
+.node-context-menu-item:hover {
+    background-color: #f0f0f0;
+}
+
+.node-context-menu-item.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.node-context-menu-item.disabled:hover {
+    background-color: transparent;
+}
+
 .node {
     position: absolute;
     background: white;
@@ -396,6 +445,22 @@ body {
 .node.constant { border-color: #FF9800; background: #FFF3E0; }
 .node.comparison { border-color: #9C27B0; background: #F3E5F5; }
 .node.io { border-color: #F44336; background: #FFEBEE; }
+.node.parameter { border-color: #FF5722; background: #FFEBE9; }
+.node.plot {
+    border-color: #00BCD4;
+    background: #E0F7FA;
+    min-width: 220px;
+    min-height: 160px;
+}
+
+.node.module-instance {
+    border-color: #673AB7;
+    background: linear-gradient(135deg, #EDE7F6 0%, #D1C4E9 100%);
+    border-width: 3px;
+    border-radius: 12px;
+    min-width: 140px;
+    box-shadow: 3px 3px 10px rgba(103, 58, 183, 0.3);
+}
 
 .node.selected {
     border-color: #FFD700 !important;
@@ -408,7 +473,7 @@ body {
 }
 
 .node.flipped .node-title,
-.node.flipped .node-id {
+.node.flipped .node-params {
     transform: scaleX(-1);
 }
 
@@ -418,10 +483,32 @@ body {
     margin-bottom: 4px;
 }
 
-.node-id {
+.node-params {
     font-size: 10px;
     color: #666;
+}
+
+.param-binding-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: #FF5722;
+    color: white;
+    border-radius: 10px;
+    padding: 2px 6px;
+    font-size: 9px;
+    font-weight: bold;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    z-index: 10;
+    pointer-events: none;
+}
+
+.param-binding-badge::before {
+    content: "🔗";
+    margin-right: 2px;
+}
     text-align: center;
+    font-weight: 500;
 }
 
 .port {
@@ -532,10 +619,15 @@ body {
 }
 
 .connection-value {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: bold;
-    fill: #333;
+    fill: #1565C0;
     text-anchor: middle;
+    pointer-events: none;
+    paint-order: stroke fill;
+    stroke: white;
+    stroke-width: 3px;
+    stroke-linejoin: round;
 }
 
 .code-editor {
@@ -763,4 +855,14 @@ body {
     background: #f9f9f9;
     border-radius: 0 0 6px 6px;
     justify-content: flex-end;
+}
+
+/* Plot node canvas */
+.plot-canvas {
+    display: block;
+    margin: 5px auto;
+    border-radius: 4px;
+    background: #f8f8f8;
+    cursor: default;
+    pointer-events: none;
 }

@@ -627,6 +627,17 @@ class VirtualMachine:
 
         return self.get_results()
 
+    def reset(self):
+        """Reset the VM execution state."""
+        print(f"[VM] Reset called - current_step was {self.current_step}, resetting to 0")
+        self.current_step = 0
+        self.halted = False
+
+        # Clear all signal values but keep signal definitions
+        for signal in self.signals.values():
+            signal.values.clear()
+        print(f"[VM] Reset complete - current_step is now {self.current_step}")
+
     def step(self):
         """Execute one simulation step."""
         # Set $step signal value

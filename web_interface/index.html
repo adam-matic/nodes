@@ -18,6 +18,13 @@
                     <button id="delete-btn" class="btn btn-danger" disabled>Del</button>
                 </div>
                 <div class="toolbar-row">
+                    <button id="new-graph-btn" class="btn btn-secondary">New</button>
+                    <button id="save-graph-btn" class="btn btn-primary">Save</button>
+                    <button id="load-graph-btn" class="btn btn-primary">Load</button>
+                    <button id="insert-module-btn" class="btn btn-secondary">Insert Module</button>
+                    <input type="file" id="file-input" accept=".mmgraph" style="display: none;">
+                </div>
+                <div class="toolbar-row">
                     <label class="auto-compile-toggle">
                         <input type="checkbox" id="auto-compile-checkbox" checked>
                         <span>Auto-compile</span>
@@ -104,6 +111,13 @@ execution {
         <a href="#" class="node-menu-item" data-type="eq">eq</a>
         <a href="#" class="node-menu-item" data-type="input">input</a>
         <a href="#" class="node-menu-item" data-type="output">output</a>
+        <a href="#" class="node-menu-item" data-type="param">param</a>
+        <a href="#" class="node-menu-item" data-type="plot">plot</a>
+    </div>
+
+    <!-- Node context menu -->
+    <div id="node-context-menu" class="node-context-menu hidden">
+        <!-- Dynamic content will be inserted here -->
     </div>
 
     <!-- Parameter panel -->

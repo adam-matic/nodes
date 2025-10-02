@@ -24,6 +24,10 @@ class NodeEditor {
         this.initialPinchDistance = 0;
         this.initialZoom = 1;
 
+        // Node context menu state
+        this.longPressTimer = null;
+        this.longPressNode = null;
+
         this.setupEventListeners();
         this.createSampleNodes();
 
@@ -50,6 +54,7 @@ class NodeEditor {
         nodeEditor.addEventListener('mousedown', (e) => this.onMouseDown(e));
         nodeEditor.addEventListener('mousemove', (e) => this.onMouseMove(e));
         nodeEditor.addEventListener('mouseup', (e) => this.onMouseUp(e));
+        nodeEditor.addEventListener('contextmenu', (e) => e.preventDefault()); // Prevent browser context menu
 
         // Touch events for mobile support
         nodeEditor.addEventListener('touchstart', (e) => this.onTouchStart(e), { passive: false });
@@ -77,6 +82,11 @@ class NodeEditor {
         document.getElementById('params-node-btn').addEventListener('click', () => this.showParameterPanel());
         document.getElementById('flip-node-btn').addEventListener('click', () => this.flipSelectedNode());
         document.getElementById('delete-btn').addEventListener('click', () => this.deleteSelected());
+        document.getElementById('new-graph-btn').addEventListener('click', () => this.newGraph());
+        document.getElementById('save-graph-btn').addEventListener('click', () => this.saveGraph());
+        document.getElementById('load-graph-btn').addEventListener('click', () => this.loadGraph());
+        document.getElementById('insert-module-btn').addEventListener('click', () => this.insertModule());
+        document.getElementById('file-input').addEventListener('change', (e) => this.handleFileSelect(e));
 
         // Parameter panel controls
         document.getElementById('close-params-btn').addEventListener('click', () => this.hideParameterPanel());
@@ -305,6 +315,40 @@ class NodeEditor {
                 `;
                 break;
 
+            case 'plot':
+                html = `
+                    <div class="parameter-field">
+                        <label for="signal-x">X Signal (default: step):</label>
+                        <input type="text" id="signal-x" value="${nodeData.parameters.signalX}" placeholder="step">
+                    </div>
+                    <div class="parameter-field">
+                        <label for="signal-y">Y Signal:</label>
+                        <input type="text" id="signal-y" value="${nodeData.parameters.signalY}" placeholder="signal_name">
+                    </div>
+                    <div class="parameter-field">
+                        <label for="history-size">History Size:</label>
+                        <input type="number" id="history-size" value="${nodeData.parameters.historySize}" min="10" max="200" step="10">
+                    </div>
+                `;
+                break;
+
+            case 'param':
+                html = `
+                    <div class="parameter-field">
+                        <label for="param-name">Parameter Name:</label>
+                        <input type="text" id="param-name" value="${nodeData.parameters.name}" placeholder="param1">
+                    </div>
+                    <div class="parameter-field">
+                        <label for="param-default">Default Value:</label>
+                        <input type="number" id="param-default" value="${nodeData.parameters.defaultValue}" step="any">
+                    </div>
+                    <div class="parameter-field">
+                        <label for="param-alias">Alias (points to internal param):</label>
+                        <input type="text" id="param-alias" value="${nodeData.parameters.alias}" placeholder="internal_param">
+                    </div>
+                `;
+                break;
+
             default:
                 html = '<p>No parameters available for this node type.</p>';
         }
@@ -331,7 +375,30 @@ class NodeEditor {
                 const constValue = document.getElementById('const-value').value;
                 nodeData.parameters.value = parseFloat(constValue) || 0;
                 break;
+
+            case 'plot':
+                const signalX = document.getElementById('signal-x').value;
+                const signalY = document.getElementById('signal-y').value;
+                const historySize = document.getElementById('history-size').value;
+                nodeData.parameters.signalX = signalX || 'step';
+                nodeData.parameters.signalY = signalY || '';
+                nodeData.parameters.historySize = parseInt(historySize) || 50;
+                // Clear plot data when parameters change
+                nodeData.parameters.plotData = [];
+                break;
+
+            case 'param':
+                const paramName = document.getElementById('param-name').value;
+                const paramDefault = document.getElementById('param-default').value;
+                const paramAlias = document.getElementById('param-alias').value;
+                nodeData.parameters.name = paramName || 'param1';
+                nodeData.parameters.defaultValue = parseFloat(paramDefault) || 0;
+                nodeData.parameters.alias = paramAlias || '';
+                break;
         }
+
+        // Update the parameter display on the node
+        this.updateNodeParameterDisplay(nodeId);
 
         this.hideParameterPanel();
 
@@ -363,7 +430,8 @@ class NodeEditor {
 
     createNode(type, pos) {
         const nodeId = `${type}_${this.nextNodeId++}`;
-        const node = this.createNodeElement(type, nodeId, pos);
+        const parameters = this.getDefaultParameters(type);
+        const node = this.createNodeElement(type, nodeId, pos, parameters);
 
         this.nodes.set(nodeId, {
             id: nodeId,
@@ -374,7 +442,7 @@ class NodeEditor {
             outputs: this.getNodeOutputs(type),
             value: null,
             isFlipped: false,
-            parameters: this.getDefaultParameters(type)
+            parameters: parameters
         });
 
         document.getElementById('viewport').appendChild(node);
@@ -385,17 +453,29 @@ class NodeEditor {
         return nodeId;
     }
 
-    createNodeElement(type, id, pos) {
+    createNodeElement(type, id, pos, parameters) {
         const node = document.createElement('div');
         node.className = `node ${this.getNodeClass(type)}`;
         node.style.left = pos.x + 'px';
         node.style.top = pos.y + 'px';
         node.dataset.nodeId = id;
 
+        // Generate parameter display text
+        const paramText = this.getParameterDisplayText(type, parameters);
+
         node.innerHTML = `
             <div class="node-title">${type}</div>
-            <div class="node-id">${id}</div>
+            <div class="node-params">${paramText}</div>
         `;
+
+        // Add plot canvas for plot nodes
+        if (type === 'plot') {
+            const canvas = document.createElement('canvas');
+            canvas.className = 'plot-canvas';
+            canvas.width = 200;
+            canvas.height = 120;
+            node.appendChild(canvas);
+        }
 
         // Add input ports
         const inputs = this.getNodeInputs(type);
@@ -422,30 +502,64 @@ class NodeEditor {
         return node;
     }
 
+    getParameterDisplayText(type, parameters) {
+        // Generate parameter display text based on node type
+        switch (type) {
+            case 'mem':
+                return `init: ${parameters.initialValue}`;
+            case 'const':
+                return `value: ${parameters.value}`;
+            case 'plot':
+                return `x: ${parameters.signalX}, y: ${parameters.signalY}`;
+            case 'param':
+                return `${parameters.name}: ${parameters.defaultValue}${parameters.alias ? ` → ${parameters.alias}` : ''}`;
+            default:
+                return ''; // No parameters to display
+        }
+    }
+
+    updateNodeParameterDisplay(nodeId) {
+        const nodeData = this.nodes.get(nodeId);
+        if (!nodeData) return;
+
+        const paramElement = nodeData.element.querySelector('.node-params');
+        if (paramElement) {
+            const paramText = this.getParameterDisplayText(nodeData.type, nodeData.parameters);
+            paramElement.textContent = paramText;
+        }
+    }
+
     getNodeClass(type) {
         if (['add', 'sub', 'mul', 'div'].includes(type)) return 'arithmetic';
         if (type === 'mem') return 'memory';
         if (type === 'const') return 'constant';
         if (['gt', 'lt', 'eq', 'gte', 'lte'].includes(type)) return 'comparison';
         if (['input', 'output'].includes(type)) return 'io';
+        if (type === 'param') return 'parameter';
+        if (type === 'plot') return 'plot';
         return '';
     }
 
-    getNodeInputs(type) {
+    getNodeInputs(type, nodeData = null) {
         if (['add', 'sub', 'mul', 'div', 'gt', 'lt', 'eq'].includes(type)) return ['a', 'b'];
         if (type === 'mem') return ['signal'];
         if (type === 'output') return ['value'];
+        if (type === 'plot') return []; // Plot nodes don't need signal inputs, only params
+        if (type === 'param') return []; // Param nodes don't have inputs
+        if (type === 'module_instance' && nodeData) return nodeData.inputs || [];
         return [];
     }
 
-    getNodeOutputs(type) {
-        if (type === 'input') return [];
+    getNodeOutputs(type, nodeData = null) {
+        if (type === 'plot') return []; // Plot nodes don't have outputs
+        if (type === 'output') return []; // Output nodes don't have outputs
+        if (type === 'module_instance' && nodeData) return nodeData.outputs || [];
         return ['out'];
     }
 
     nodeHasParameters(type) {
         // Define which node types have configurable parameters
-        return ['mem', 'const'].includes(type);
+        return ['mem', 'const', 'plot', 'param'].includes(type);
     }
 
     getDefaultParameters(type) {
@@ -454,6 +568,19 @@ class NodeEditor {
                 return { initialValue: 0 };
             case 'const':
                 return { value: 1 };
+            case 'plot':
+                return {
+                    signalX: 'step',
+                    signalY: '',
+                    historySize: 50,
+                    plotData: []
+                };
+            case 'param':
+                return {
+                    name: 'param1',
+                    defaultValue: 0,
+                    alias: ''
+                };
             default:
                 return {};
         }
@@ -464,6 +591,15 @@ class NodeEditor {
             this.startConnection(e);
         } else if (e.target.closest('.node')) {
             const node = e.target.closest('.node');
+
+            // Right-click - show context menu
+            if (e.button === 2) {
+                e.preventDefault();
+                this.selectNode(node);
+                this.showNodeContextMenu(e, node);
+                return;
+            }
+
             this.selectNode(node);
             this.startDrag(e);
         } else {
@@ -494,19 +630,34 @@ class NodeEditor {
 
         if (e.touches.length === 2) {
             // Two finger pinch - start zoom
+            this.clearLongPressTimer();
             this.startPinchZoom(e);
         } else if (e.touches.length === 1) {
             const touch = e.touches[0];
             const target = document.elementFromPoint(touch.clientX, touch.clientY);
 
             if (target && target.classList.contains('port')) {
+                this.clearLongPressTimer();
                 this.startConnectionTouch(touch, target);
             } else if (target && target.closest('.node')) {
                 const node = target.closest('.node');
                 this.selectNode(node);
+
+                // Start long-press timer for context menu
+                this.longPressNode = node;
+                this.longPressTimer = setTimeout(() => {
+                    // Trigger haptic feedback
+                    if ('vibrate' in navigator) {
+                        navigator.vibrate(50);
+                    }
+                    this.showNodeContextMenu(touch, node);
+                    this.longPressNode = null;
+                }, 500); // 500ms long press
+
                 this.startDragTouch(touch, target);
             } else {
                 // Touched empty space - clear selection and start panning
+                this.clearLongPressTimer();
                 this.clearSelection();
                 this.startPan(touch);
             }
@@ -515,6 +666,9 @@ class NodeEditor {
 
     onTouchMove(e) {
         e.preventDefault(); // Prevent scrolling
+
+        // Cancel long press if touch moves
+        this.clearLongPressTimer();
 
         if (e.touches.length === 2) {
             // Two finger pinch - update zoom
@@ -625,16 +779,29 @@ class NodeEditor {
 
         const startPortY = startNode.pos.y + 20 + this.connectionStart.portIndex * 15 + 6;
 
+        // Port offset from edge
+        const portOffset = 6;
+
         // Account for flipped nodes
         let startX;
         if (this.connectionStart.portType === 'output') {
-            startX = startNode.isFlipped ?
-                startNode.pos.x : // left edge when flipped
-                startNode.pos.x + startNode.element.offsetWidth; // right edge when normal
+            // Output port
+            if (startNode.isFlipped) {
+                // When flipped, output ports are visually on the left
+                startX = startNode.pos.x + portOffset;
+            } else {
+                // Normal: output ports on the right
+                startX = startNode.pos.x + startNode.element.offsetWidth - portOffset;
+            }
         } else {
-            startX = startNode.isFlipped ?
-                startNode.pos.x + startNode.element.offsetWidth : // right edge when flipped
-                startNode.pos.x; // left edge when normal
+            // Input port
+            if (startNode.isFlipped) {
+                // When flipped, input ports are visually on the right
+                startX = startNode.pos.x + startNode.element.offsetWidth - portOffset;
+            } else {
+                // Normal: input ports on the left
+                startX = startNode.pos.x + portOffset;
+            }
         }
 
         const startY = startPortY;
@@ -645,7 +812,7 @@ class NodeEditor {
         const screenEndY = touch.clientY - editorRect.top;
         const worldEnd = this.screenToWorld(screenEndX, screenEndY);
 
-        const path = this.createConnectionPath(startX, startY, worldEnd.x, worldEnd.y);
+        const path = this.createConnectionPath(startX, startY, worldEnd.x, worldEnd.y, startNode, null);
         this.tempConnection.setAttribute('d', path);
     }
 
@@ -695,6 +862,16 @@ class NodeEditor {
 
         this.panX += dx;
         this.panY += dy;
+
+        // Apply pan limits to prevent panning too far
+        // Limit upward panning (positive panY values)
+        const maxPanY = 100; // Allow only 100px upward pan
+        const minPanY = -5000; // Allow panning down
+        const maxPanX = 5000; // Allow panning right
+        const minPanX = -5000; // Allow panning left
+
+        this.panY = Math.max(minPanY, Math.min(maxPanY, this.panY));
+        this.panX = Math.max(minPanX, Math.min(maxPanX, this.panX));
 
         this.lastPanPosition = { x: touch.clientX, y: touch.clientY };
         this.updateViewportTransform();
@@ -827,16 +1004,29 @@ class NodeEditor {
 
         const startPortY = startNode.pos.y + 20 + this.connectionStart.portIndex * 15 + 6;
 
+        // Port offset from edge
+        const portOffset = 6;
+
         // Account for flipped nodes
         let startX;
         if (this.connectionStart.portType === 'output') {
-            startX = startNode.isFlipped ?
-                startNode.pos.x : // left edge when flipped
-                startNode.pos.x + startNode.element.offsetWidth; // right edge when normal
+            // Output port
+            if (startNode.isFlipped) {
+                // When flipped, output ports are visually on the left
+                startX = startNode.pos.x + portOffset;
+            } else {
+                // Normal: output ports on the right
+                startX = startNode.pos.x + startNode.element.offsetWidth - portOffset;
+            }
         } else {
-            startX = startNode.isFlipped ?
-                startNode.pos.x + startNode.element.offsetWidth : // right edge when flipped
-                startNode.pos.x; // left edge when normal
+            // Input port
+            if (startNode.isFlipped) {
+                // When flipped, input ports are visually on the right
+                startX = startNode.pos.x + startNode.element.offsetWidth - portOffset;
+            } else {
+                // Normal: input ports on the left
+                startX = startNode.pos.x + portOffset;
+            }
         }
 
         const startY = startPortY;
@@ -847,7 +1037,7 @@ class NodeEditor {
         const screenEndY = e.clientY - editorRect.top;
         const worldEnd = this.screenToWorld(screenEndX, screenEndY);
 
-        const path = this.createConnectionPath(startX, startY, worldEnd.x, worldEnd.y);
+        const path = this.createConnectionPath(startX, startY, worldEnd.x, worldEnd.y, startNode, null);
         this.tempConnection.setAttribute('d', path);
     }
 
@@ -888,8 +1078,12 @@ class NodeEditor {
             [from, to] = [to, from];
         }
 
+        // Generate unique wire name
+        const wireName = this.generateWireName(from.nodeId, to.nodeId);
+
         const connection = {
             id: `conn_${this.connections.length}`,
+            wireName: wireName,  // NEW: Each wire has a unique name
             from: from,
             to: to,
             value: null,
@@ -1005,37 +1199,56 @@ class NodeEditor {
         const fromPortY = fromNode.pos.y + 20 + connection.from.portIndex * 15 + 6; // center of port
         const toPortY = toNode.pos.y + 20 + connection.to.portIndex * 15 + 6;
 
+        // Port offset from edge (ports are positioned at -6px for input, and at width-6px for output)
+        const portOffset = 6;
+
         // Account for flipped nodes
         let startX, endX;
 
         if (connection.from.portType === 'output') {
             // From node output port
-            startX = fromNode.isFlipped ?
-                fromNode.pos.x : // left edge when flipped
-                fromNode.pos.x + fromNode.element.offsetWidth; // right edge when normal
+            if (fromNode.isFlipped) {
+                // When flipped, output ports are visually on the left
+                startX = fromNode.pos.x + portOffset;
+            } else {
+                // Normal: output ports on the right
+                startX = fromNode.pos.x + fromNode.element.offsetWidth - portOffset;
+            }
         } else {
             // From node input port
-            startX = fromNode.isFlipped ?
-                fromNode.pos.x + fromNode.element.offsetWidth : // right edge when flipped
-                fromNode.pos.x; // left edge when normal
+            if (fromNode.isFlipped) {
+                // When flipped, input ports are visually on the right
+                startX = fromNode.pos.x + fromNode.element.offsetWidth - portOffset;
+            } else {
+                // Normal: input ports on the left
+                startX = fromNode.pos.x + portOffset;
+            }
         }
 
         if (connection.to.portType === 'input') {
             // To node input port
-            endX = toNode.isFlipped ?
-                toNode.pos.x + toNode.element.offsetWidth : // right edge when flipped
-                toNode.pos.x; // left edge when normal
+            if (toNode.isFlipped) {
+                // When flipped, input ports are visually on the right
+                endX = toNode.pos.x + toNode.element.offsetWidth - portOffset;
+            } else {
+                // Normal: input ports on the left
+                endX = toNode.pos.x + portOffset;
+            }
         } else {
             // To node output port
-            endX = toNode.isFlipped ?
-                toNode.pos.x : // left edge when flipped
-                toNode.pos.x + toNode.element.offsetWidth; // right edge when normal
+            if (toNode.isFlipped) {
+                // When flipped, output ports are visually on the left
+                endX = toNode.pos.x + portOffset;
+            } else {
+                // Normal: output ports on the right
+                endX = toNode.pos.x + toNode.element.offsetWidth - portOffset;
+            }
         }
 
         const startY = fromPortY;
         const endY = toPortY;
 
-        const path = this.createConnectionPath(startX, startY, endX, endY);
+        const path = this.createConnectionPath(startX, startY, endX, endY, fromNode, toNode);
         connection.pathElement.setAttribute('d', path);
 
         // Update the invisible touch area with the same path
@@ -1043,11 +1256,17 @@ class NodeEditor {
             connection.touchArea.setAttribute('d', path);
         }
 
-        // Position value text at midpoint
+        // Position wire label at midpoint showing "wireName=value"
         const midX = (startX + endX) / 2;
         const midY = (startY + endY) / 2;
         connection.textElement.setAttribute('x', midX);
         connection.textElement.setAttribute('y', midY - 5);
+
+        // Update text content to show wire name and value
+        const displayText = connection.value !== null ?
+            `${connection.wireName}=${connection.value}` :
+            connection.wireName;
+        connection.textElement.textContent = displayText;
     }
 
     createConnectionPath(x1, y1, x2, y2) {
@@ -1104,6 +1323,12 @@ class NodeEditor {
 
             if (result.success) {
                 this.addOutput(`✓ ${result.message}\n`);
+
+                // Reset step counter on successful compilation (server resets it to 0)
+                this.currentStep = 0;
+                document.getElementById('step-counter').textContent = 'Step: 0';
+                document.getElementById('toolbar-step-counter').textContent = 'Step: 0';
+
                 if (result.max_steps) {
                     this.maxSteps = result.max_steps;
                     // Update the UI input to reflect the compiled max_steps value
@@ -1138,15 +1363,20 @@ class NodeEditor {
                 document.getElementById('toolbar-run-btn').textContent = 'Stop';
                 this.addOutput('Starting execution...\n');
 
-                this.executionInterval = setInterval(async () => {
+                // Get current max_steps value from the UI
+                const maxStepsInput = document.getElementById('max-steps-input');
+                const currentMaxSteps = maxStepsInput ? parseInt(maxStepsInput.value) || 10 : 10;
+
+                // Execute all steps as fast as possible
+                while (this.isRunning && this.currentStep < currentMaxSteps) {
                     await this.executeStep();
-                    // Get current max_steps value from the UI
-                    const maxStepsInput = document.getElementById('max-steps-input');
-                    const currentMaxSteps = maxStepsInput ? parseInt(maxStepsInput.value) || 10 : 10;
-                    if (this.currentStep >= currentMaxSteps) {
-                        this.stopExecution();
-                    }
-                }, 500);
+                }
+
+                // Stop when done
+                if (this.isRunning) {
+                    this.stopExecution();
+                    this.addOutput('Execution completed.\n');
+                }
             } else {
                 this.addOutput(`✗ ${result.message}\n`);
             }
@@ -1199,21 +1429,30 @@ class NodeEditor {
 
     updateConnectionValues(signals) {
         this.connections.forEach((conn, index) => {
-            // Try to match connection to signal by node types
-            const fromNodeType = this.nodes.get(conn.from.nodeId)?.type;
-            const signalKey = `${fromNodeType}_${conn.from.nodeId.split('_')[1]}_out`;
+            // Look up the signal value using the wire name
+            let value = signals[conn.wireName];
 
-            let value = signals[signalKey];
             if (value === undefined) {
-                // Fallback to index-based or random value
+                // Fallback: try to match by node types (old method)
+                const fromNodeType = this.nodes.get(conn.from.nodeId)?.type;
+                const signalKey = `${fromNodeType}_${conn.from.nodeId.split('_')[1]}_out`;
+                value = signals[signalKey];
+            }
+
+            if (value === undefined) {
+                // Last resort fallback
                 const signalKeys = Object.keys(signals);
                 value = signalKeys[index % signalKeys.length] ? signals[signalKeys[index % signalKeys.length]] : Math.random() * 10;
             }
 
             conn.value = value;
-            conn.textElement.textContent = value.toString();
+            // Text is updated in updateConnection() which will be called after this
+            this.updateConnection(conn);
             conn.element.classList.add('active');
         });
+
+        // Update plot nodes
+        this.updatePlots(signals);
 
         // Remove active class after a short delay
         setTimeout(() => {
@@ -1223,16 +1462,128 @@ class NodeEditor {
         }, 200);
     }
 
+    updatePlots(signals) {
+        this.nodes.forEach((nodeData, nodeId) => {
+            if (nodeData.type === 'plot') {
+                const signalX = nodeData.parameters.signalX || 'step';
+                const signalY = nodeData.parameters.signalY;
+
+                if (!signalY) return; // No Y signal configured
+
+                // Get X and Y values
+                let xValue = signalX === 'step' ? this.currentStep : (signals[signalX] || 0);
+                let yValue = signals[signalY] || 0;
+
+                // Add to plot data
+                if (!nodeData.parameters.plotData) {
+                    nodeData.parameters.plotData = [];
+                }
+                nodeData.parameters.plotData.push({ x: xValue, y: yValue });
+
+                // Limit history size
+                const historySize = nodeData.parameters.historySize || 50;
+                if (nodeData.parameters.plotData.length > historySize) {
+                    nodeData.parameters.plotData.shift();
+                }
+
+                // Render the plot
+                this.renderPlot(nodeData);
+            }
+        });
+    }
+
+    renderPlot(nodeData) {
+        const canvas = nodeData.element.querySelector('.plot-canvas');
+        if (!canvas) return;
+
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+
+        // Clear canvas
+        ctx.fillStyle = '#f8f8f8';
+        ctx.fillRect(0, 0, width, height);
+
+        // Draw border
+        ctx.strokeStyle = '#ccc';
+        ctx.strokeRect(0, 0, width, height);
+
+        const data = nodeData.parameters.plotData || [];
+        if (data.length < 2) return;
+
+        // Find min/max values for scaling
+        const xValues = data.map(d => d.x);
+        const yValues = data.map(d => d.y);
+        const xMin = Math.min(...xValues);
+        const xMax = Math.max(...xValues);
+        const yMin = Math.min(...yValues);
+        const yMax = Math.max(...yValues);
+
+        // Add padding for better visualization
+        const xRange = xMax - xMin || 1;
+        const yRange = yMax - yMin || 1;
+        const padding = 10;
+
+        // Scale functions
+        const scaleX = (x) => padding + ((x - xMin) / xRange) * (width - 2 * padding);
+        const scaleY = (y) => height - padding - ((y - yMin) / yRange) * (height - 2 * padding);
+
+        // Draw grid lines
+        ctx.strokeStyle = '#e0e0e0';
+        ctx.lineWidth = 0.5;
+        for (let i = 0; i <= 4; i++) {
+            const y = padding + (i / 4) * (height - 2 * padding);
+            ctx.beginPath();
+            ctx.moveTo(padding, y);
+            ctx.lineTo(width - padding, y);
+            ctx.stroke();
+        }
+
+        // Draw line
+        ctx.strokeStyle = '#2196F3';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        data.forEach((point, index) => {
+            const x = scaleX(point.x);
+            const y = scaleY(point.y);
+            if (index === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        });
+        ctx.stroke();
+
+        // Draw points
+        ctx.fillStyle = '#1976D2';
+        data.forEach(point => {
+            const x = scaleX(point.x);
+            const y = scaleY(point.y);
+            ctx.beginPath();
+            ctx.arc(x, y, 2, 0, 2 * Math.PI);
+            ctx.fill();
+        });
+
+        // Draw axis labels
+        ctx.fillStyle = '#666';
+        ctx.font = '10px Arial';
+        ctx.textAlign = 'right';
+        ctx.fillText(yMax.toFixed(1), padding - 2, padding + 10);
+        ctx.fillText(yMin.toFixed(1), padding - 2, height - padding);
+    }
+
 
     async reset() {
         this.stopExecution();
 
+        // Reset step counter immediately
+        this.currentStep = 0;
+        document.getElementById('step-counter').textContent = 'Step: 0';
+        document.getElementById('toolbar-step-counter').textContent = 'Step: 0';
+
         try {
             const result = await this.apiClient.resetProgram();
 
-            this.currentStep = 0;
-            document.getElementById('step-counter').textContent = 'Step: 0';
-            document.getElementById('toolbar-step-counter').textContent = 'Step: 0';
             document.getElementById('output').textContent = 'Ready to execute...\n';
 
             // Reset variable table flag
@@ -1243,6 +1594,14 @@ class NodeEditor {
                 conn.value = null;
                 conn.textElement.textContent = '';
                 conn.element.classList.remove('active');
+            });
+
+            // Clear plot data
+            this.nodes.forEach((nodeData, nodeId) => {
+                if (nodeData.type === 'plot') {
+                    nodeData.parameters.plotData = [];
+                    this.renderPlot(nodeData);
+                }
             });
 
             if (result.success) {
@@ -1448,11 +1807,11 @@ class NodeEditor {
 
         // Check for unconnected input ports
         this.nodes.forEach(nodeData => {
-            if (nodeData.type === 'output' || nodeData.type === 'const') {
+            if (nodeData.type === 'output' || nodeData.type === 'const' || nodeData.type === 'input') {
                 return; // These don't need inputs
             }
 
-            const nodeInputs = this.getNodeInputs(nodeData.type);
+            const nodeInputs = this.getNodeInputs(nodeData.type, nodeData);
             nodeInputs.forEach((inputName, inputIndex) => {
                 const isConnected = this.connections.some(conn =>
                     conn.to.nodeId === nodeData.id && conn.to.portIndex === inputIndex
@@ -1593,64 +1952,115 @@ class NodeEditor {
             return '';
         }
 
-        let code = 'module visual_graph {\n';
-        const addedVariables = new Set();
-
-        // Sort nodes for consistent ordering
-        const sortedNodes = Array.from(this.nodes.values()).sort((a, b) => a.id.localeCompare(b.id));
-
-        // Generate assignments for each node
-        sortedNodes.forEach(nodeData => {
-            if (nodeData.type === 'output') {
-                // Find what's connected to this output
-                const connection = this.connections.find(conn => conn.to.nodeId === nodeData.id);
-                if (connection) {
-                    const sourceVar = this.getVariableName(connection.from.nodeId, connection.from.portIndex);
-                    code += `    output ${sourceVar}\n`;
+        // First, collect all module definitions from module instances
+        const moduleDefinitions = new Map();
+        this.nodes.forEach((nodeData, nodeId) => {
+            if (nodeData.type === 'module_instance' && nodeData.moduleDefinition) {
+                const moduleName = nodeData.moduleName || 'module';
+                if (!moduleDefinitions.has(moduleName)) {
+                    moduleDefinitions.set(moduleName, nodeData.moduleDefinition);
                 }
-                return;
             }
+        });
 
-            if (nodeData.type === 'const') {
-                const varName = this.getVariableName(nodeData.id, 0);
-                const value = nodeData.parameters.value || 1;
-                // Ensure the value is a valid number
-                const numValue = isNaN(value) ? 1 : Number(value);
-                code += `    ${varName} = const(value=${numValue})\n`;
-                addedVariables.add(varName);
-                return;
-            }
+        // Generate module definitions first
+        let code = '';
+        moduleDefinitions.forEach((moduleDef, moduleName) => {
+            code += this.generateModuleDefinitionCode(moduleDef, moduleName);
+            code += '\n\n';
+        });
 
-            // For other node types, find their inputs
-            const nodeInputs = this.getNodeInputs(nodeData.type);
-            const inputConnections = [];
+        code += 'module visual_graph {\n';
+        const addedWires = new Set();
 
-            nodeInputs.forEach((inputName, inputIndex) => {
-                const connection = this.connections.find(conn =>
-                    conn.to.nodeId === nodeData.id && conn.to.portIndex === inputIndex
-                );
-                if (connection) {
-                    inputConnections[inputIndex] = this.getVariableName(connection.from.nodeId, connection.from.portIndex);
+        // Sort connections for consistent ordering
+        const sortedConnections = [...this.connections].sort((a, b) => a.wireName.localeCompare(b.wireName));
+
+        // Process each connection, generating wire = operation(...) syntax
+        sortedConnections.forEach(conn => {
+            const fromNode = this.nodes.get(conn.from.nodeId);
+            const toNode = this.nodes.get(conn.to.nodeId);
+
+            if (!fromNode || !toNode) return;
+
+            // Skip if this wire was already defined
+            if (addedWires.has(conn.wireName)) return;
+
+            // Handle different source node types
+            if (fromNode.type === 'input') {
+                // Input nodes just pass through - wire name is same as input name
+                addedWires.add(conn.wireName);
+            } else if (fromNode.type === 'param') {
+                // Param nodes output their parameter value
+                const paramName = fromNode.parameters.name || 'param1';
+                code += `    ${conn.wireName} = ${paramName}\n`;
+                addedWires.add(conn.wireName);
+            } else if (fromNode.type === 'const') {
+                // Check for parameter binding
+                const valueBinding = this.getParameterBinding(fromNode, 'value');
+                if (valueBinding) {
+                    code += `    ${conn.wireName} = const((value = ${valueBinding}))\n`;
                 } else {
-                    inputConnections[inputIndex] = '0'; // Default value for unconnected inputs
+                    const value = fromNode.parameters.value || 1;
+                    const numValue = isNaN(value) ? 1 : Number(value);
+                    code += `    ${conn.wireName} = const(value=${numValue})\n`;
                 }
-            });
+                addedWires.add(conn.wireName);
+            } else if (fromNode.type === 'mem') {
+                // Find input wire to the mem node
+                const memInputConn = this.connections.find(c => c.to.nodeId === fromNode.id);
+                const inputWire = memInputConn ? memInputConn.wireName : '0';
 
-            if (inputConnections.length > 0) {
-                const varName = this.getVariableName(nodeData.id, 0);
-                if (!addedVariables.has(varName)) {
-                    let params = inputConnections.join(', ');
-
-                    // Special handling for mem nodes
-                    if (nodeData.type === 'mem') {
-                        const initialValue = nodeData.parameters.initialValue || 0;
-                        const numInitialValue = isNaN(initialValue) ? 0 : Number(initialValue);
-                        params = `${numInitialValue}, ${inputConnections[0] || '0'}`;
-                    }
-
-                    code += `    ${varName} = ${nodeData.type}(${params})\n`;
-                    addedVariables.add(varName);
+                // Check for parameter binding on initialValue
+                const initialValueBinding = this.getParameterBinding(fromNode, 'initialValue');
+                if (initialValueBinding) {
+                    code += `    ${conn.wireName} = mem((initial_value = ${initialValueBinding}), ${inputWire})\n`;
+                } else {
+                    const initialValue = fromNode.parameters.initialValue || 0;
+                    const numInitialValue = isNaN(initialValue) ? 0 : Number(initialValue);
+                    code += `    ${conn.wireName} = mem(${numInitialValue}, ${inputWire})\n`;
                 }
+                addedWires.add(conn.wireName);
+            } else if (['add', 'sub', 'mul', 'div', 'gt', 'lt', 'eq', 'gte', 'lte'].includes(fromNode.type)) {
+                // Find input wires to the operation node
+                const nodeInputs = this.getNodeInputs(fromNode.type);
+                const inputWires = [];
+
+                nodeInputs.forEach((inputName, inputIndex) => {
+                    const inputConn = this.connections.find(c =>
+                        c.to.nodeId === fromNode.id && c.to.portIndex === inputIndex
+                    );
+                    inputWires[inputIndex] = inputConn ? inputConn.wireName : '0';
+                });
+
+                const params = inputWires.join(', ');
+                code += `    ${conn.wireName} = ${fromNode.type}(${params})\n`;
+                addedWires.add(conn.wireName);
+            } else if (fromNode.type === 'module_instance') {
+                // Find input wires to the module instance
+                const nodeInputs = this.getNodeInputs(fromNode.type, fromNode);
+                const inputWires = [];
+
+                nodeInputs.forEach((inputName, inputIndex) => {
+                    const inputConn = this.connections.find(c =>
+                        c.to.nodeId === fromNode.id && c.to.portIndex === inputIndex
+                    );
+                    inputWires[inputIndex] = inputConn ? inputConn.wireName : '0';
+                });
+
+                const params = inputWires.join(', ');
+                const moduleName = fromNode.moduleName || 'module';
+                code += `    ${conn.wireName} = ${moduleName}(${params})\n`;
+                addedWires.add(conn.wireName);
+            }
+        });
+
+        // Handle output statements
+        const outputNodes = Array.from(this.nodes.values()).filter(n => n.type === 'output');
+        outputNodes.forEach(outputNode => {
+            const connection = this.connections.find(conn => conn.to.nodeId === outputNode.id);
+            if (connection) {
+                code += `    output ${connection.wireName}\n`;
             }
         });
 
@@ -1662,23 +2072,74 @@ class NodeEditor {
         const maxSteps = maxStepsInput ? parseInt(maxStepsInput.value) || 10 : 10;
         code += `    max_steps: ${maxSteps}\n`;
 
-        // Add save variables for outputs
-        const outputVariables = [];
+        // Add save variables for outputs (use wire names)
+        const outputWires = [];
         this.connections.forEach(conn => {
             const toNode = this.nodes.get(conn.to.nodeId);
             if (toNode && toNode.type === 'output') {
-                const sourceVar = this.getVariableName(conn.from.nodeId, conn.from.portIndex);
-                outputVariables.push(sourceVar);
+                outputWires.push(conn.wireName);
             }
         });
 
-        if (outputVariables.length > 0) {
-            code += `    save: [${outputVariables.join(', ')}]\n`;
+        if (outputWires.length > 0) {
+            code += `    save: [${outputWires.join(', ')}]\n`;
         }
 
         code += '}';
 
         return code;
+    }
+
+    getParameterBinding(nodeData, paramKey) {
+        // Check if this parameter is bound to a param node
+        if (!nodeData.parameterBindings || !nodeData.parameterBindings[paramKey]) {
+            return null;
+        }
+
+        const paramNodeId = nodeData.parameterBindings[paramKey];
+        const paramNode = this.nodes.get(paramNodeId);
+
+        if (!paramNode || paramNode.type !== 'param') {
+            return null;
+        }
+
+        // Return the parameter name
+        return paramNode.parameters.name || 'param1';
+    }
+
+    generateWireName(fromNodeId, toNodeId) {
+        // Generate wire name based ONLY on source node and port
+        // This ensures multiple connections from the same output share the same wire name
+        const fromNode = this.nodes.get(fromNodeId);
+
+        if (!fromNode) {
+            return `signal_${this.connections.length}`;
+        }
+
+        // Extract numeric ID from node ID
+        const fromNum = fromNodeId.split('_')[1] || '1';
+
+        // Generate a descriptive name based on the source node type
+        let wireName;
+
+        if (fromNode.type === 'input') {
+            wireName = `in_${fromNum}`;
+        } else if (fromNode.type === 'param') {
+            // Use the parameter name directly
+            wireName = fromNode.parameters?.name || `param_${fromNum}`;
+        } else if (fromNode.type === 'const') {
+            wireName = `const_${fromNum}_out`;
+        } else if (fromNode.type === 'mem') {
+            wireName = `mem_${fromNum}_out`;
+        } else if (['add', 'sub', 'mul', 'div'].includes(fromNode.type)) {
+            wireName = `${fromNode.type}_${fromNum}_result`;
+        } else if (['gt', 'lt', 'eq', 'gte', 'lte'].includes(fromNode.type)) {
+            wireName = `${fromNode.type}_${fromNum}_result`;
+        } else {
+            wireName = `${fromNode.type}_${fromNum}_out`;
+        }
+
+        return wireName;
     }
 
     getVariableName(nodeId, portIndex) {
@@ -1867,6 +2328,7 @@ class NodeEditor {
         menu.id = 'connection-menu';
         menu.className = 'connection-menu';
         menu.innerHTML = `
+            <div class="connection-menu-item" data-action="rename">✏️ Rename Wire</div>
             <div class="connection-menu-item" data-action="delete">🗑 Delete Connection</div>
             <div class="connection-menu-item" data-action="info">ℹ Connection Info</div>
         `;
@@ -1900,7 +2362,9 @@ class NodeEditor {
         // Add event listeners
         menu.addEventListener('click', (menuE) => {
             const action = menuE.target.dataset.action;
-            if (action === 'delete') {
+            if (action === 'rename') {
+                this.renameWire(connection);
+            } else if (action === 'delete') {
                 this.deleteConnection(connection);
             } else if (action === 'info') {
                 this.showConnectionInfo(connection);
@@ -1912,7 +2376,9 @@ class NodeEditor {
         menu.addEventListener('touchend', (menuE) => {
             menuE.preventDefault();
             const action = menuE.target.dataset.action;
-            if (action === 'delete') {
+            if (action === 'rename') {
+                this.renameWire(connection);
+            } else if (action === 'delete') {
                 this.deleteConnection(connection);
             } else if (action === 'info') {
                 this.showConnectionInfo(connection);
@@ -1935,14 +2401,45 @@ class NodeEditor {
         }, 10);
     }
 
+    renameWire(connection) {
+        const currentName = connection.wireName;
+        const newName = prompt(`Rename wire "${currentName}" to:`, currentName);
+
+        if (newName && newName.trim() !== '' && newName !== currentName) {
+            // Validate wire name (must be valid identifier)
+            const validName = newName.trim().replace(/[^a-zA-Z0-9_]/g, '_');
+
+            if (validName !== newName.trim()) {
+                alert(`Invalid wire name. Using sanitized name: ${validName}`);
+            }
+
+            // Check for duplicate wire names
+            const duplicateExists = this.connections.some(c => c.wireName === validName && c !== connection);
+            if (duplicateExists) {
+                alert(`Wire name "${validName}" already exists. Please choose a different name.`);
+                return;
+            }
+
+            // Update wire name
+            connection.wireName = validName;
+
+            // Update visual display
+            this.updateConnection(connection);
+
+            // Trigger recompilation
+            this.scheduleAutoCompile();
+        }
+    }
+
     showConnectionInfo(connection) {
         const fromNode = this.nodes.get(connection.from.nodeId);
         const toNode = this.nodes.get(connection.to.nodeId);
 
         const info = `Connection Info:
+Wire Name: ${connection.wireName}
 From: ${fromNode?.type || 'unknown'} (${connection.from.nodeId})
 To: ${toNode?.type || 'unknown'} (${connection.to.nodeId})
-Current Value: ${connection.value || 'none'}`;
+Current Value: ${connection.value !== null ? connection.value : 'none'}`;
 
         alert(info);
     }
@@ -1992,7 +2489,702 @@ Current Value: ${connection.value || 'none'}`;
         // Escape key - clear selections
         if (e.key === 'Escape') {
             this.clearSelection();
+            this.hideNodeContextMenu();
         }
+    }
+
+    deleteSelected() {
+        if (this.selectedNode) {
+            const nodeId = this.selectedNode.dataset.nodeId;
+            const nodeData = this.nodes.get(nodeId);
+
+            // If deleting a param node, remove all bindings to it
+            if (nodeData && nodeData.type === 'param') {
+                this.removeParameterBindings(nodeId);
+            }
+
+            // Remove the node's connections
+            this.connections = this.connections.filter(conn => {
+                if (conn.from.nodeId === nodeId || conn.to.nodeId === nodeId) {
+                    if (conn.element && conn.element.parentNode) {
+                        conn.element.parentNode.removeChild(conn.element);
+                    }
+                    return false;
+                }
+                return true;
+            });
+
+            // Remove the node element
+            if (nodeData && nodeData.element && nodeData.element.parentNode) {
+                nodeData.element.parentNode.removeChild(nodeData.element);
+            }
+
+            // Remove from nodes map
+            this.nodes.delete(nodeId);
+
+            this.selectedNode = null;
+            this.updateToolbarButtonStates();
+            this.scheduleAutoCompile();
+        } else if (this.selectedConnection) {
+            // Delete connection
+            const connIndex = this.connections.indexOf(this.selectedConnection);
+            if (connIndex !== -1) {
+                if (this.selectedConnection.element && this.selectedConnection.element.parentNode) {
+                    this.selectedConnection.element.parentNode.removeChild(this.selectedConnection.element);
+                }
+                this.connections.splice(connIndex, 1);
+            }
+            this.selectedConnection = null;
+            this.scheduleAutoCompile();
+        }
+    }
+
+    removeParameterBindings(paramNodeId) {
+        // Find all nodes that have bindings to this param node and remove them
+        this.nodes.forEach((nodeData, nodeId) => {
+            if (nodeData.parameterBindings) {
+                Object.keys(nodeData.parameterBindings).forEach(paramKey => {
+                    if (nodeData.parameterBindings[paramKey] === paramNodeId) {
+                        delete nodeData.parameterBindings[paramKey];
+                        this.updateParameterBindingBadge(nodeId);
+                    }
+                });
+            }
+        });
+    }
+
+    // Node Context Menu Methods
+
+    clearLongPressTimer() {
+        if (this.longPressTimer) {
+            clearTimeout(this.longPressTimer);
+            this.longPressTimer = null;
+        }
+        this.longPressNode = null;
+    }
+
+    showNodeContextMenu(event, nodeElement) {
+        // Cancel any ongoing drag
+        if (this.isDragging) {
+            this.isDragging = false;
+            if (this.selectedNode) {
+                this.selectedNode.classList.remove('dragging');
+            }
+        }
+
+        const nodeId = nodeElement.dataset.nodeId;
+        const nodeData = this.nodes.get(nodeId);
+
+        if (!nodeData) return;
+
+        const menu = document.getElementById('node-context-menu');
+        menu.innerHTML = '';
+
+        // Get exportable parameters for this node type
+        const exportableParams = this.getExportableParameters(nodeData.type);
+
+        if (exportableParams.length === 0) {
+            menu.innerHTML = '<div class="node-context-menu-item disabled">No exportable parameters</div>';
+        } else {
+            exportableParams.forEach(param => {
+                const item = document.createElement('div');
+                item.className = 'node-context-menu-item';
+                item.innerHTML = `📤 Export "${param.label}" parameter`;
+                item.dataset.paramKey = param.key;
+                item.dataset.nodeId = nodeId;
+
+                item.addEventListener('click', () => this.exportParameter(nodeId, param.key));
+                item.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.exportParameter(nodeId, param.key);
+                });
+
+                menu.appendChild(item);
+            });
+        }
+
+        // Position menu at click/touch location
+        const clientX = event.clientX || event.pageX || (event.touches && event.touches[0].clientX) || 0;
+        const clientY = event.clientY || event.pageY || (event.touches && event.touches[0].clientY) || 0;
+
+        menu.style.left = clientX + 'px';
+        menu.style.top = clientY + 'px';
+        menu.style.position = 'fixed';
+        menu.classList.remove('hidden');
+
+        // Adjust position if menu goes off screen
+        setTimeout(() => {
+            const menuRect = menu.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+
+            if (menuRect.right > viewportWidth) {
+                menu.style.left = (clientX - menuRect.width) + 'px';
+            }
+            if (menuRect.bottom > viewportHeight) {
+                menu.style.top = (clientY - menuRect.height) + 'px';
+            }
+        }, 0);
+
+        // Close menu when clicking elsewhere
+        const closeMenu = (e) => {
+            if (!menu.contains(e.target)) {
+                this.hideNodeContextMenu();
+                document.removeEventListener('click', closeMenu);
+                document.removeEventListener('touchstart', closeMenu);
+            }
+        };
+
+        setTimeout(() => {
+            document.addEventListener('click', closeMenu);
+            document.addEventListener('touchstart', closeMenu);
+        }, 10);
+    }
+
+    hideNodeContextMenu() {
+        const menu = document.getElementById('node-context-menu');
+        menu.classList.add('hidden');
+    }
+
+    getExportableParameters(nodeType) {
+        // Define which parameters can be exported for each node type
+        const exportable = {
+            'const': [{ key: 'value', label: 'value' }],
+            'mem': [{ key: 'initialValue', label: 'initial value' }],
+            'plot': [
+                { key: 'signalX', label: 'X signal' },
+                { key: 'signalY', label: 'Y signal' },
+                { key: 'historySize', label: 'history size' }
+            ]
+        };
+
+        return exportable[nodeType] || [];
+    }
+
+    exportParameter(nodeId, paramKey) {
+        const nodeData = this.nodes.get(nodeId);
+        if (!nodeData) return;
+
+        // Close the context menu
+        this.hideNodeContextMenu();
+
+        // Create a param node near the original node
+        const offset = { x: 150, y: -50 };
+        const paramPos = {
+            x: nodeData.pos.x + offset.x,
+            y: nodeData.pos.y + offset.y
+        };
+
+        // Generate parameter name based on node type and param key
+        const paramName = `${nodeData.type}_${paramKey}_${nodeId.split('_')[1] || '1'}`;
+
+        // Get current parameter value as default
+        const currentValue = nodeData.parameters[paramKey] || 0;
+
+        // Create param node
+        const paramNodeId = this.createNode('param', paramPos);
+        const paramNodeData = this.nodes.get(paramNodeId);
+
+        if (paramNodeData) {
+            paramNodeData.parameters.name = paramName;
+            paramNodeData.parameters.defaultValue = currentValue;
+            paramNodeData.parameters.alias = '';
+
+            // Store binding metadata (no wires!)
+            if (!nodeData.parameterBindings) {
+                nodeData.parameterBindings = {};
+            }
+            nodeData.parameterBindings[paramKey] = paramNodeId;
+
+            // Update param node display
+            this.updateNodeParameterDisplay(paramNodeId);
+
+            // Add visual badge to the original node
+            this.updateParameterBindingBadge(nodeId);
+
+            this.addOutput(`Exported parameter "${paramKey}" as "${paramName}"\n`);
+
+            // Trigger auto-compile
+            this.scheduleAutoCompile();
+        }
+    }
+
+    updateParameterBindingBadge(nodeId) {
+        const nodeData = this.nodes.get(nodeId);
+        if (!nodeData) return;
+
+        const nodeElement = nodeData.element;
+
+        // Remove existing badge
+        const existingBadge = nodeElement.querySelector('.param-binding-badge');
+        if (existingBadge) {
+            existingBadge.remove();
+        }
+
+        // Count bound parameters
+        const bindingCount = nodeData.parameterBindings ? Object.keys(nodeData.parameterBindings).length : 0;
+
+        if (bindingCount > 0) {
+            const badge = document.createElement('div');
+            badge.className = 'param-binding-badge';
+            badge.textContent = bindingCount;
+            nodeElement.appendChild(badge);
+        }
+    }
+
+    // Save/Load/Module Methods
+
+    serializeGraph() {
+        const nodesArray = [];
+        this.nodes.forEach((nodeData, nodeId) => {
+            nodesArray.push({
+                id: nodeId,
+                type: nodeData.type,
+                pos: { x: nodeData.pos.x, y: nodeData.pos.y },
+                isFlipped: nodeData.isFlipped || false,
+                parameters: nodeData.parameters || {},
+                parameterBindings: nodeData.parameterBindings || {},
+                moduleName: nodeData.moduleName || null,
+                moduleDefinition: nodeData.moduleDefinition || null
+            });
+        });
+
+        const connectionsArray = this.connections.map(conn => ({
+            id: conn.id,
+            wireName: conn.wireName,
+            from: {
+                nodeId: conn.from.nodeId,
+                portType: conn.from.portType,
+                portIndex: conn.from.portIndex
+            },
+            to: {
+                nodeId: conn.to.nodeId,
+                portType: conn.to.portType,
+                portIndex: conn.to.portIndex
+            }
+        }));
+
+        const graphData = {
+            version: "1.0",
+            metadata: {
+                name: this.graphName || "untitled",
+                description: "",
+                created: this.createdTimestamp || new Date().toISOString(),
+                modified: new Date().toISOString()
+            },
+            viewport: {
+                zoom: this.zoom,
+                panX: this.panX,
+                panY: this.panY
+            },
+            nodes: nodesArray,
+            connections: connectionsArray,
+            compiledCode: this.generateCodeFromGraph(),
+            executionSettings: {
+                maxSteps: parseInt(document.getElementById('max-steps-input').value) || 10
+            }
+        };
+
+        return graphData;
+    }
+
+    saveGraph() {
+        const graphData = this.serializeGraph();
+
+        // Prompt for filename
+        const filename = prompt("Enter filename:", this.graphName || "graph") || "graph";
+        this.graphName = filename;
+
+        // Convert to JSON
+        const jsonString = JSON.stringify(graphData, null, 2);
+
+        // Create blob and download
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename.endsWith('.mmgraph') ? filename : filename + '.mmgraph';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        this.addOutput(`Graph saved as ${a.download}\n`);
+    }
+
+    newGraph() {
+        // Confirm before clearing
+        if (this.nodes.size > 0) {
+            const confirm = window.confirm('Create a new graph? This will clear the current graph.');
+            if (!confirm) return;
+        }
+
+        // Clear the graph
+        this.clearGraph();
+
+        // Reset graph metadata
+        this.graphName = 'untitled';
+        this.createdTimestamp = new Date().toISOString();
+
+        // Reset viewport
+        this.zoom = 1;
+        this.panX = 0;
+        this.panY = 0;
+        this.updateViewportTransform();
+
+        // Reset execution settings
+        document.getElementById('max-steps-input').value = 10;
+
+        this.addOutput('New graph created\n');
+    }
+
+    loadGraph() {
+        // Trigger file input
+        this.isLoadingAsModule = false;
+        document.getElementById('file-input').click();
+    }
+
+    insertModule() {
+        // Trigger file input for module insertion
+        this.isLoadingAsModule = true;
+        document.getElementById('file-input').click();
+    }
+
+    handleFileSelect(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const graphData = JSON.parse(e.target.result);
+
+                if (this.isLoadingAsModule) {
+                    // Insert as module instance
+                    const nodeEditor = document.getElementById('visual-tab');
+                    const editorRect = nodeEditor.getBoundingClientRect();
+                    const centerX = editorRect.width / 2;
+                    const centerY = editorRect.height / 2;
+                    const pos = this.screenToWorld(centerX, centerY);
+
+                    this.loadGraphAsModuleInstance(graphData, pos);
+                } else {
+                    // Load as full graph replacement
+                    this.loadGraphFromFile(graphData);
+                }
+
+                // Reset file input
+                event.target.value = '';
+            } catch (error) {
+                this.addOutput(`Error loading file: ${error.message}\n`);
+                console.error('Error loading graph:', error);
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    loadGraphFromFile(graphData) {
+        // Clear existing graph
+        this.clearGraph();
+
+        // Restore metadata
+        this.graphName = graphData.metadata?.name || "untitled";
+        this.createdTimestamp = graphData.metadata?.created || new Date().toISOString();
+
+        // Restore viewport
+        if (graphData.viewport) {
+            this.zoom = graphData.viewport.zoom || 1;
+            this.panX = graphData.viewport.panX || 0;
+            this.panY = graphData.viewport.panY || 0;
+            this.updateViewportTransform();
+        }
+
+        // Restore nodes
+        const nodeIdMap = new Map(); // Old ID -> New ID mapping
+        graphData.nodes.forEach(nodeData => {
+            const newNodeId = this.createNode(nodeData.type, nodeData.pos);
+            nodeIdMap.set(nodeData.id, newNodeId);
+
+            // Restore parameters
+            const newNodeData = this.nodes.get(newNodeId);
+            if (newNodeData) {
+                newNodeData.parameters = nodeData.parameters || {};
+                newNodeData.parameterBindings = nodeData.parameterBindings || {};
+                newNodeData.isFlipped = nodeData.isFlipped || false;
+                newNodeData.moduleName = nodeData.moduleName || null;
+                newNodeData.moduleDefinition = nodeData.moduleDefinition || null;
+
+                // Update visual appearance
+                if (newNodeData.isFlipped) {
+                    newNodeData.element.classList.add('flipped');
+                }
+                this.updateNodeParameterDisplay(newNodeId);
+
+                // Restore parameter binding badges
+                if (Object.keys(newNodeData.parameterBindings).length > 0) {
+                    this.updateParameterBindingBadge(newNodeId);
+                }
+            }
+        });
+
+        // Restore connections
+        graphData.connections.forEach(connData => {
+            const fromNodeId = nodeIdMap.get(connData.from.nodeId);
+            const toNodeId = nodeIdMap.get(connData.to.nodeId);
+
+            if (fromNodeId && toNodeId) {
+                const fromNode = this.nodes.get(fromNodeId);
+                const toNode = this.nodes.get(toNodeId);
+
+                if (fromNode && toNode) {
+                    const fromPort = fromNode.element.querySelectorAll('.port.output')[connData.from.portIndex];
+                    const toPort = toNode.element.querySelectorAll('.port.input')[connData.to.portIndex];
+
+                    if (fromPort && toPort) {
+                        const connection = {
+                            nodeId: fromNodeId,
+                            portType: connData.from.portType,
+                            portIndex: connData.from.portIndex,
+                            element: fromPort
+                        };
+
+                        const targetConnection = {
+                            nodeId: toNodeId,
+                            portType: connData.to.portType,
+                            portIndex: connData.to.portIndex,
+                            element: toPort
+                        };
+
+                        this.createConnection(connection, targetConnection);
+
+                        // Restore wire name
+                        const lastConn = this.connections[this.connections.length - 1];
+                        if (lastConn && connData.wireName) {
+                            lastConn.wireName = connData.wireName;
+                        }
+                    }
+                }
+            }
+        });
+
+        // Restore execution settings
+        if (graphData.executionSettings) {
+            document.getElementById('max-steps-input').value = graphData.executionSettings.maxSteps || 10;
+        }
+
+        // Trigger auto-compile
+        this.scheduleAutoCompile();
+
+        this.addOutput(`Graph loaded: ${this.graphName}\n`);
+    }
+
+    clearGraph() {
+        // Remove all connections
+        this.connections.forEach(conn => {
+            if (conn.element && conn.element.parentNode) {
+                conn.element.parentNode.removeChild(conn.element);
+            }
+        });
+        this.connections = [];
+
+        // Remove all nodes
+        this.nodes.forEach((nodeData, nodeId) => {
+            if (nodeData.element && nodeData.element.parentNode) {
+                nodeData.element.parentNode.removeChild(nodeData.element);
+            }
+        });
+        this.nodes.clear();
+
+        // Reset state
+        this.nextNodeId = 1;
+        this.clearSelection();
+    }
+
+    loadGraphAsModuleInstance(graphData, position) {
+        // Analyze the graph to determine inputs, outputs, and parameters
+        const inputNodes = [];
+        const outputNodes = [];
+        const paramNodes = [];
+
+        graphData.nodes.forEach(nodeData => {
+            if (nodeData.type === 'input') {
+                inputNodes.push(nodeData);
+            } else if (nodeData.type === 'output') {
+                outputNodes.push(nodeData);
+            } else if (nodeData.type === 'const' && nodeData.parameters?.isParam) {
+                paramNodes.push(nodeData);
+            }
+        });
+
+        // Create module instance node ID
+        const moduleName = graphData.metadata?.name || 'module';
+        const nodeId = `${moduleName}_${this.nextNodeId++}`;
+
+        // Create custom node inputs/outputs based on the graph
+        const inputs = inputNodes.map((node, idx) => `in_${idx}`);
+        const outputs = outputNodes.map((node, idx) => `out_${idx}`);
+
+        // Create module instance node
+        const parameters = {
+            modulePath: moduleName + '.mmgraph',
+            ...graphData.executionSettings
+        };
+
+        const node = this.createModuleInstanceElement(moduleName, nodeId, position, parameters, inputs, outputs);
+
+        this.nodes.set(nodeId, {
+            id: nodeId,
+            type: 'module_instance',
+            element: node,
+            pos: position,
+            inputs: inputs,
+            outputs: outputs,
+            value: null,
+            isFlipped: false,
+            parameters: parameters,
+            moduleName: moduleName,
+            moduleDefinition: graphData // Store the entire graph definition
+        });
+
+        document.getElementById('viewport').appendChild(node);
+
+        // Trigger validation and auto-compilation
+        this.scheduleAutoCompile();
+
+        this.addOutput(`Module instance created: ${moduleName}\n`);
+    }
+
+    createModuleInstanceElement(moduleName, id, pos, parameters, inputs, outputs) {
+        const node = document.createElement('div');
+        node.className = 'node module-instance';
+        node.style.left = pos.x + 'px';
+        node.style.top = pos.y + 'px';
+        node.dataset.nodeId = id;
+
+        node.innerHTML = `
+            <div class="node-title">📦 ${moduleName}</div>
+            <div class="node-params">${inputs.length} in, ${outputs.length} out</div>
+        `;
+
+        // Add input ports
+        inputs.forEach((input, index) => {
+            const port = document.createElement('div');
+            port.className = 'port input';
+            port.style.top = `${20 + index * 15}px`;
+            port.dataset.portType = 'input';
+            port.dataset.portIndex = index;
+            node.appendChild(port);
+        });
+
+        // Add output ports
+        outputs.forEach((output, index) => {
+            const port = document.createElement('div');
+            port.className = 'port output';
+            port.style.top = `${20 + index * 15}px`;
+            port.dataset.portType = 'output';
+            port.dataset.portIndex = index;
+            node.appendChild(port);
+        });
+
+        return node;
+    }
+
+    generateModuleDefinitionCode(graphData, moduleName) {
+        // Generate code for a module definition from a saved graph
+        let code = `module ${moduleName} {\n`;
+        const addedWires = new Set();
+
+        // Find input, output, and param nodes to generate declarations
+        const inputNodes = graphData.nodes.filter(n => n.type === 'input');
+        const outputNodes = graphData.nodes.filter(n => n.type === 'output');
+        const paramNodes = graphData.nodes.filter(n => n.type === 'param');
+
+        // Generate param declarations first
+        paramNodes.forEach((paramNode) => {
+            const paramName = paramNode.parameters?.name || 'param1';
+            const defaultValue = paramNode.parameters?.defaultValue || 0;
+            const alias = paramNode.parameters?.alias || '';
+
+            if (alias) {
+                // This param is an alias for another internal param
+                code += `    param ${paramName} = ${defaultValue}  // alias for ${alias}\n`;
+            } else {
+                code += `    param ${paramName} = ${defaultValue}\n`;
+            }
+        });
+
+        // Generate input declarations
+        inputNodes.forEach((inputNode, idx) => {
+            code += `    input in_${idx}\n`;
+        });
+
+        // Sort connections for consistent ordering
+        const sortedConnections = [...graphData.connections].sort((a, b) =>
+            a.wireName.localeCompare(b.wireName)
+        );
+
+        // Generate signal assignments (similar to main graph generation)
+        sortedConnections.forEach(conn => {
+            const fromNode = graphData.nodes.find(n => n.id === conn.from.nodeId);
+            const toNode = graphData.nodes.find(n => n.id === conn.to.nodeId);
+
+            if (!fromNode || !toNode) return;
+            if (addedWires.has(conn.wireName)) return;
+
+            // Skip input and param nodes - they're already declared
+            if (fromNode.type === 'input') {
+                addedWires.add(conn.wireName);
+                return;
+            }
+
+            if (fromNode.type === 'param') {
+                // Param nodes just provide their name as the wire value
+                addedWires.add(conn.wireName);
+                return;
+            }
+
+            // Handle different node types
+            if (fromNode.type === 'const') {
+                const value = fromNode.parameters?.value || 1;
+                const numValue = isNaN(value) ? 1 : Number(value);
+                code += `    ${conn.wireName} = const(value=${numValue})\n`;
+                addedWires.add(conn.wireName);
+            } else if (fromNode.type === 'mem') {
+                const memInputConn = graphData.connections.find(c => c.to.nodeId === fromNode.id);
+                const inputWire = memInputConn ? memInputConn.wireName : '0';
+                const initialValue = fromNode.parameters?.initialValue || 0;
+                const numInitialValue = isNaN(initialValue) ? 0 : Number(initialValue);
+                code += `    ${conn.wireName} = mem(${numInitialValue}, ${inputWire})\n`;
+                addedWires.add(conn.wireName);
+            } else if (['add', 'sub', 'mul', 'div', 'gt', 'lt', 'eq', 'gte', 'lte'].includes(fromNode.type)) {
+                const inputWires = [];
+                const numInputs = fromNode.type === 'mem' ? 1 : 2;
+
+                for (let i = 0; i < numInputs; i++) {
+                    const inputConn = graphData.connections.find(c =>
+                        c.to.nodeId === fromNode.id && c.to.portIndex === i
+                    );
+                    inputWires[i] = inputConn ? inputConn.wireName : '0';
+                }
+
+                const params = inputWires.join(', ');
+                code += `    ${conn.wireName} = ${fromNode.type}(${params})\n`;
+                addedWires.add(conn.wireName);
+            }
+        });
+
+        // Generate output statements
+        outputNodes.forEach((outputNode, idx) => {
+            const connection = graphData.connections.find(c => c.to.nodeId === outputNode.id);
+            if (connection) {
+                code += `    output out_${idx} ${connection.wireName}\n`;
+            }
+        });
+
+        code += '}';
+
+        return code;
     }
 }
 
