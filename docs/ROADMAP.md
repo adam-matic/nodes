@@ -35,10 +35,15 @@ one-off dev scripts and can be fixed if/when needed.
 
 ## Phase 1 — JS solver
 
-- [ ] Port tokenizer, parser, and VM to a plain ES module
-      (`web_interface/assets/solver/`), validated against the golden fixtures.
-- [ ] Switch the frontend to in-browser execution; demote `server.py` to
-      optional static file serving.
+- [x] Port tokenizer, parser, and VM to JavaScript
+      (`web_interface/assets/solver/`), validated against the golden fixtures
+      (`node tests/js_solver_test.js`, 36/36 passing).
+- [x] Switch the frontend to in-browser execution: `api.js` is now a local
+      client with the same interface; `server.py` is only needed as a static
+      file server (any static server works).
+- [x] Module imports resolve in-browser through a generated registry
+      (`assets/solver/stdlib.js`); regenerate with `node tools/build_stdlib.js`
+      after changing example modules.
 
 ## Phase 2 — Plots
 

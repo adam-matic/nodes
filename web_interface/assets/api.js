@@ -1,111 +1,138 @@
 /**
- * API Client for Modular Math Language Web Interface
- * Handles communication with the backend server for code compilation and execution
+ * Local API Client for the Modular Math Language Web Interface.
+ *
+ * Drop-in replacement for the old HTTP client: same methods and response
+ * shapes, but compilation and execution run in the browser using the JS
+ * solver (assets/solver/). No server needed — any static file server works.
  */
 
 class APIClient {
     constructor() {
-        this.baseUrl = this.detectServerUrl();
-        this.connected = false;
-        this.checkConnection();
-    }
-
-    detectServerUrl() {
-        // Detect server URL based on current location
-        return window.location.origin;
+        this.connected = true; // The solver runs locally; always available
+        this.vm = null;
+        this.compiled = false;
+        this.maxSteps = 0;
+        this.updateConnectionStatus();
     }
 
     async checkConnection() {
-        try {
-            const response = await fetch(`${this.baseUrl}/api/status`, {
-                method: 'GET',
-                timeout: 5000
-            });
-            this.connected = response.ok;
-        } catch (error) {
-            this.connected = false;
-        }
-
+        this.connected = true;
         this.updateConnectionStatus();
-        return this.connected;
+        return true;
     }
 
     updateConnectionStatus() {
         const statusElement = document.getElementById('connection-status');
         if (statusElement) {
-            if (this.connected) {
-                statusElement.textContent = 'Server Connected';
-                statusElement.className = 'connection-status connected';
-            } else {
-                statusElement.textContent = 'Server Disconnected';
-                statusElement.className = 'connection-status disconnected';
-            }
+            statusElement.textContent = 'Local Solver Ready';
+            statusElement.className = 'connection-status connected';
         }
     }
 
     async compileCode(code) {
-        if (!this.connected) {
-            throw new Error('Server not available. Please start the Python server.');
+        try {
+            if (!code.trim()) {
+                throw new Error('Empty code provided');
+            }
+
+            const program = parseString(code);
+            const vm = new VirtualMachine();
+            vm.loadProgram(program);
+
+            this.vm = vm;
+            this.compiled = true;
+            this.maxSteps = vm.maxSteps;
+
+            return {
+                success: true,
+                message: `Program compiled successfully. Max steps: ${vm.maxSteps}`,
+                max_steps: vm.maxSteps,
+            };
+        } catch (error) {
+            this.compiled = false;
+            return {
+                success: false,
+                message: `Compilation error: ${error.message}`,
+            };
         }
-
-        const response = await fetch(`${this.baseUrl}/api/compile`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ code })
-        });
-
-        const result = await response.json();
-        return result;
-    }
-
-    async executeStep() {
-        if (!this.connected) {
-            throw new Error('Server not available. Please start the Python server.');
-        }
-
-        const response = await fetch(`${this.baseUrl}/api/step`, {
-            method: 'POST'
-        });
-
-        const result = await response.json();
-        return result;
     }
 
     async runProgram() {
-        if (!this.connected) {
-            throw new Error('Server not available. Please start the Python server.');
+        if (!this.compiled || !this.vm) {
+            return {
+                success: false,
+                message: 'No program compiled. Please compile first.',
+            };
         }
 
-        const response = await fetch(`${this.baseUrl}/api/run`, {
-            method: 'POST'
-        });
+        return {
+            success: true,
+            message: 'Program execution started',
+            running: true,
+        };
+    }
 
-        const result = await response.json();
-        return result;
+    async executeStep() {
+        if (!this.compiled || !this.vm) {
+            return {
+                success: false,
+                message: 'No program compiled. Please compile first.',
+            };
+        }
+
+        if (this.vm.currentStep >= this.vm.maxSteps) {
+            return {
+                success: false,
+                message: 'Maximum steps reached',
+            };
+        }
+
+        try {
+            this.vm.step();
+
+            return {
+                success: true,
+                message: `Step ${this.vm.currentStep} executed`,
+                step: this.vm.currentStep,
+                signals: this.getCurrentSignals(),
+                halted: this.vm.halted,
+            };
+        } catch (error) {
+            return {
+                success: false,
+                message: `Execution error: ${error.message}`,
+            };
+        }
     }
 
     async resetProgram() {
-        if (!this.connected) {
-            throw new Error('Server not available. Please start the Python server.');
+        if (this.vm) {
+            this.vm.reset();
         }
 
-        const response = await fetch(`${this.baseUrl}/api/reset`, {
-            method: 'POST'
-        });
-
-        const result = await response.json();
-        return result;
+        return {
+            success: true,
+            message: 'Program reset',
+            step: 0,
+        };
     }
 
     async getSignals() {
-        if (!this.connected) {
-            throw new Error('Server not available. Please start the Python server.');
+        return this.getCurrentSignals();
+    }
+
+    getCurrentSignals() {
+        const signals = {};
+        if (!this.vm) return signals;
+
+        // Values for the step that was just executed (currentStep was
+        // incremented after execution unless the program halted)
+        const executedStep = Math.max(0, this.vm.currentStep - 1);
+
+        for (const [name, signal] of Object.entries(this.vm.signals)) {
+            signals[name] = signal.getValue(executedStep);
         }
 
-        const response = await fetch(`${this.baseUrl}/api/signals`);
-        const signals = await response.json();
         return signals;
     }
 }
