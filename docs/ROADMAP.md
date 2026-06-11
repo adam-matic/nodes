@@ -47,11 +47,17 @@ one-off dev scripts and can be fixed if/when needed.
 
 ## Phase 2 — Plots
 
-- [ ] Replace the fixed 200×120 plot-node canvas with a proper plot panel:
-      multiple traces, axes with autoscaling, zoom/pan, live updates during
-      runs, CSV/PNG export.
-- [ ] Rendering: grow the hand-rolled canvas code or adopt uPlot (~45 KB,
-      fast time-series, no build step required).
+- [x] Replace the fixed 200×120 plot-node canvas with a proper plot panel:
+      the "Plots" tab shows one chart per plot node, with multiple traces
+      (comma-separated Y signals), autoscaled axes with ticks and grid,
+      wheel zoom / drag pan / double-click reset, live updates during runs
+      (the run loop now yields to the browser each frame), and CSV/PNG
+      export per chart.
+- [x] Rendering: grew the hand-rolled canvas code into
+      `web_interface/assets/plot.js` (PlotView/PlotPanel) — kept zero
+      dependencies and no build step rather than adopting uPlot. The
+      scaling/tick/history logic is unit-tested
+      (`node tests/js_plot_test.js`).
 
 ## Phase 3 — Desktop UI
 

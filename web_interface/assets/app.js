@@ -28,6 +28,9 @@ class NodeEditor {
         this.longPressTimer = null;
         this.longPressNode = null;
 
+        // Plot panel (Plots tab) — one chart per plot node in the graph
+        this.plotPanel = new PlotPanel(document.getElementById('plots-container'));
+
         this.setupEventListeners();
         this.createSampleNodes();
 
@@ -130,7 +133,13 @@ class NodeEditor {
 
         document.getElementById('visual-tab').classList.toggle('hidden', tabName !== 'visual');
         document.getElementById('code-tab').classList.toggle('hidden', tabName !== 'code');
+        document.getElementById('plots-tab').classList.toggle('hidden', tabName !== 'plots');
         document.getElementById('output-tab').classList.toggle('hidden', tabName !== 'output');
+
+        // Canvases have zero size while the tab is hidden, so redraw on show
+        if (tabName === 'plots') {
+            this.plotPanel.renderAll();
+        }
 
         // Clear output tab indicator when user views output
         if (tabName === 'output') {
@@ -259,6 +268,7 @@ class NodeEditor {
 
         // Remove from nodes map
         this.nodes.delete(nodeId);
+        this.syncPlotPanel();
 
         // Clear selection
         this.selectedNodeForHighlight = null;
@@ -322,12 +332,12 @@ class NodeEditor {
                         <input type="text" id="signal-x" value="${nodeData.parameters.signalX}" placeholder="step">
                     </div>
                     <div class="parameter-field">
-                        <label for="signal-y">Y Signal:</label>
-                        <input type="text" id="signal-y" value="${nodeData.parameters.signalY}" placeholder="signal_name">
+                        <label for="signal-y">Y Signals (comma-separated):</label>
+                        <input type="text" id="signal-y" value="${nodeData.parameters.signalY}" placeholder="signal_a, signal_b">
                     </div>
                     <div class="parameter-field">
-                        <label for="history-size">History Size:</label>
-                        <input type="number" id="history-size" value="${nodeData.parameters.historySize}" min="10" max="200" step="10">
+                        <label for="history-size">History Size (points kept):</label>
+                        <input type="number" id="history-size" value="${nodeData.parameters.historySize}" min="10" max="100000" step="10">
                     </div>
                 `;
                 break;
@@ -382,9 +392,8 @@ class NodeEditor {
                 const historySize = document.getElementById('history-size').value;
                 nodeData.parameters.signalX = signalX || 'step';
                 nodeData.parameters.signalY = signalY || '';
-                nodeData.parameters.historySize = parseInt(historySize) || 50;
-                // Clear plot data when parameters change
-                nodeData.parameters.plotData = [];
+                nodeData.parameters.historySize = parseInt(historySize) || 1000;
+                this.syncPlotPanel();
                 break;
 
             case 'param':
@@ -447,6 +456,10 @@ class NodeEditor {
 
         document.getElementById('viewport').appendChild(node);
 
+        if (type === 'plot') {
+            this.syncPlotPanel();
+        }
+
         // Trigger validation and auto-compilation after node creation
         this.scheduleAutoCompile();
 
@@ -467,15 +480,6 @@ class NodeEditor {
             <div class="node-title">${type}</div>
             <div class="node-params">${paramText}</div>
         `;
-
-        // Add plot canvas for plot nodes
-        if (type === 'plot') {
-            const canvas = document.createElement('canvas');
-            canvas.className = 'plot-canvas';
-            canvas.width = 200;
-            canvas.height = 120;
-            node.appendChild(canvas);
-        }
 
         // Add input ports
         const inputs = this.getNodeInputs(type);
@@ -572,8 +576,7 @@ class NodeEditor {
                 return {
                     signalX: 'step',
                     signalY: '',
-                    historySize: 50,
-                    plotData: []
+                    historySize: 1000
                 };
             case 'param':
                 return {
@@ -1367,9 +1370,15 @@ class NodeEditor {
                 const maxStepsInput = document.getElementById('max-steps-input');
                 const currentMaxSteps = maxStepsInput ? parseInt(maxStepsInput.value) || 10 : 10;
 
-                // Execute all steps as fast as possible
+                // Execute steps as fast as possible, but yield to the
+                // browser regularly so plots and outputs update live
+                let lastYield = performance.now();
                 while (this.isRunning && this.currentStep < currentMaxSteps) {
                     await this.executeStep();
+                    if (performance.now() - lastYield > 12) {
+                        await new Promise(resolve => setTimeout(resolve, 0));
+                        lastYield = performance.now();
+                    }
                 }
 
                 // Stop when done
@@ -1462,114 +1471,48 @@ class NodeEditor {
         }, 200);
     }
 
-    updatePlots(signals) {
-        this.nodes.forEach((nodeData, nodeId) => {
-            if (nodeData.type === 'plot') {
-                const signalX = nodeData.parameters.signalX || 'step';
-                const signalY = nodeData.parameters.signalY;
-
-                if (!signalY) return; // No Y signal configured
-
-                // Get X and Y values
-                let xValue = signalX === 'step' ? this.currentStep : (signals[signalX] || 0);
-                let yValue = signals[signalY] || 0;
-
-                // Add to plot data
-                if (!nodeData.parameters.plotData) {
-                    nodeData.parameters.plotData = [];
-                }
-                nodeData.parameters.plotData.push({ x: xValue, y: yValue });
-
-                // Limit history size
-                const historySize = nodeData.parameters.historySize || 50;
-                if (nodeData.parameters.plotData.length > historySize) {
-                    nodeData.parameters.plotData.shift();
-                }
-
-                // Render the plot
-                this.renderPlot(nodeData);
-            }
-        });
+    getPlotYSignals(nodeData) {
+        return (nodeData.parameters.signalY || '')
+            .split(',')
+            .map(s => s.trim())
+            .filter(Boolean);
     }
 
-    renderPlot(nodeData) {
-        const canvas = nodeData.element.querySelector('.plot-canvas');
-        if (!canvas) return;
-
-        const ctx = canvas.getContext('2d');
-        const width = canvas.width;
-        const height = canvas.height;
-
-        // Clear canvas
-        ctx.fillStyle = '#f8f8f8';
-        ctx.fillRect(0, 0, width, height);
-
-        // Draw border
-        ctx.strokeStyle = '#ccc';
-        ctx.strokeRect(0, 0, width, height);
-
-        const data = nodeData.parameters.plotData || [];
-        if (data.length < 2) return;
-
-        // Find min/max values for scaling
-        const xValues = data.map(d => d.x);
-        const yValues = data.map(d => d.y);
-        const xMin = Math.min(...xValues);
-        const xMax = Math.max(...xValues);
-        const yMin = Math.min(...yValues);
-        const yMax = Math.max(...yValues);
-
-        // Add padding for better visualization
-        const xRange = xMax - xMin || 1;
-        const yRange = yMax - yMin || 1;
-        const padding = 10;
-
-        // Scale functions
-        const scaleX = (x) => padding + ((x - xMin) / xRange) * (width - 2 * padding);
-        const scaleY = (y) => height - padding - ((y - yMin) / yRange) * (height - 2 * padding);
-
-        // Draw grid lines
-        ctx.strokeStyle = '#e0e0e0';
-        ctx.lineWidth = 0.5;
-        for (let i = 0; i <= 4; i++) {
-            const y = padding + (i / 4) * (height - 2 * padding);
-            ctx.beginPath();
-            ctx.moveTo(padding, y);
-            ctx.lineTo(width - padding, y);
-            ctx.stroke();
-        }
-
-        // Draw line
-        ctx.strokeStyle = '#2196F3';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        data.forEach((point, index) => {
-            const x = scaleX(point.x);
-            const y = scaleY(point.y);
-            if (index === 0) {
-                ctx.moveTo(x, y);
-            } else {
-                ctx.lineTo(x, y);
-            }
+    /** Rebuild the Plots tab so it has one chart per plot node. */
+    syncPlotPanel() {
+        const configs = [];
+        this.nodes.forEach((nodeData) => {
+            if (nodeData.type !== 'plot') return;
+            configs.push({
+                id: nodeData.id,
+                title: nodeData.id,
+                xSignal: nodeData.parameters.signalX || 'step',
+                ySignals: this.getPlotYSignals(nodeData),
+                maxPoints: parseInt(nodeData.parameters.historySize) || 1000
+            });
         });
-        ctx.stroke();
+        this.plotPanel.sync(configs);
+    }
 
-        // Draw points
-        ctx.fillStyle = '#1976D2';
-        data.forEach(point => {
-            const x = scaleX(point.x);
-            const y = scaleY(point.y);
-            ctx.beginPath();
-            ctx.arc(x, y, 2, 0, 2 * Math.PI);
-            ctx.fill();
+    updatePlots(signals) {
+        this.nodes.forEach((nodeData) => {
+            if (nodeData.type !== 'plot') return;
+
+            const ySignals = this.getPlotYSignals(nodeData);
+            if (ySignals.length === 0) return;
+
+            const signalX = nodeData.parameters.signalX || 'step';
+            let xValue = signalX === 'step' ? this.currentStep : signals[signalX];
+            if (typeof xValue !== 'number') xValue = this.currentStep;
+
+            // Missing signals become null, which renders as a gap in the trace
+            const yValues = ySignals.map(name => {
+                const value = signals[name];
+                return typeof value === 'number' && isFinite(value) ? value : null;
+            });
+
+            this.plotPanel.appendData(nodeData.id, xValue, yValues);
         });
-
-        // Draw axis labels
-        ctx.fillStyle = '#666';
-        ctx.font = '10px Arial';
-        ctx.textAlign = 'right';
-        ctx.fillText(yMax.toFixed(1), padding - 2, padding + 10);
-        ctx.fillText(yMin.toFixed(1), padding - 2, height - padding);
     }
 
 
@@ -1597,12 +1540,7 @@ class NodeEditor {
             });
 
             // Clear plot data
-            this.nodes.forEach((nodeData, nodeId) => {
-                if (nodeData.type === 'plot') {
-                    nodeData.parameters.plotData = [];
-                    this.renderPlot(nodeData);
-                }
-            });
+            this.plotPanel.clearData();
 
             if (result.success) {
                 this.addOutput(`✓ ${result.message}\n`);
@@ -1629,8 +1567,9 @@ class NodeEditor {
             outputTab.style.color = '#2196F3';
         }
 
-        // Auto-switch to output tab when starting execution
-        if (this.isRunning && text.includes('Starting execution')) {
+        // Auto-switch to output tab when starting execution, unless the
+        // user is watching the plots
+        if (this.isRunning && text.includes('Starting execution') && currentTab !== 'plots') {
             this.switchTab('output');
         }
     }
@@ -2521,6 +2460,7 @@ Current Value: ${connection.value !== null ? connection.value : 'none'}`;
 
             // Remove from nodes map
             this.nodes.delete(nodeId);
+            this.syncPlotPanel();
 
             this.selectedNode = null;
             this.updateToolbarButtonStates();
@@ -2738,12 +2678,17 @@ Current Value: ${connection.value !== null ? connection.value : 'none'}`;
     serializeGraph() {
         const nodesArray = [];
         this.nodes.forEach((nodeData, nodeId) => {
+            // Plot data lives in the plot panel now; drop the legacy
+            // plotData field so saved files stay small
+            const parameters = { ...(nodeData.parameters || {}) };
+            delete parameters.plotData;
+
             nodesArray.push({
                 id: nodeId,
                 type: nodeData.type,
                 pos: { x: nodeData.pos.x, y: nodeData.pos.y },
                 isFlipped: nodeData.isFlipped || false,
-                parameters: nodeData.parameters || {},
+                parameters: parameters,
                 parameterBindings: nodeData.parameterBindings || {},
                 moduleName: nodeData.moduleName || null,
                 moduleDefinition: nodeData.moduleDefinition || null
@@ -2973,6 +2918,9 @@ Current Value: ${connection.value !== null ? connection.value : 'none'}`;
             document.getElementById('max-steps-input').value = graphData.executionSettings.maxSteps || 10;
         }
 
+        // Plot node parameters were restored after node creation
+        this.syncPlotPanel();
+
         // Trigger auto-compile
         this.scheduleAutoCompile();
 
@@ -2995,6 +2943,7 @@ Current Value: ${connection.value !== null ? connection.value : 'none'}`;
             }
         });
         this.nodes.clear();
+        this.syncPlotPanel();
 
         // Reset state
         this.nextNodeId = 1;
