@@ -10,6 +10,7 @@
     <script src="assets/solver/vm.js"></script>
     <script src="assets/solver/stdlib.js"></script>
     <script src="assets/api.js"></script>
+    <script src="assets/plot.js"></script>
 </head>
 <body>
     <div class="container">
@@ -50,6 +51,7 @@
             <div class="tabs">
                 <div class="tab active" data-tab="visual">Visual Editor</div>
                 <div class="tab" data-tab="code">Code Editor</div>
+                <div class="tab" data-tab="plots">Plots</div>
                 <div class="tab" data-tab="output">Output</div>
             </div>
 
@@ -80,6 +82,11 @@ execution {
     max_steps: 10
     save: [current_value]
 }</textarea>
+                </div>
+
+                <!-- Plots Tab -->
+                <div id="plots-tab" class="hidden">
+                    <div id="plots-container" class="plots-container"></div>
                 </div>
 
                 <!-- Output Tab -->

@@ -446,12 +446,7 @@ body {
 .node.comparison { border-color: #9C27B0; background: #F3E5F5; }
 .node.io { border-color: #F44336; background: #FFEBEE; }
 .node.parameter { border-color: #FF5722; background: #FFEBE9; }
-.node.plot {
-    border-color: #00BCD4;
-    background: #E0F7FA;
-    min-width: 220px;
-    min-height: 160px;
-}
+.node.plot { border-color: #00BCD4; background: #E0F7FA; }
 
 .node.module-instance {
     border-color: #673AB7;
@@ -857,12 +852,86 @@ body {
     justify-content: flex-end;
 }
 
-/* Plot node canvas */
-.plot-canvas {
+/* Plots tab */
+#plots-tab {
+    width: 100%;
+    height: 100%;
+    overflow-y: auto;
+    background: #f0f0f0;
+}
+
+.plots-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px;
+}
+
+.plots-empty-hint {
+    padding: 30px 20px;
+    text-align: center;
+    color: #888;
+    font-size: 14px;
+}
+
+.plot-card {
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.plot-card-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    background: #fafafa;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.plot-card-title {
+    font-weight: bold;
+    font-size: 13px;
+    color: #333;
+}
+
+.plot-card-info {
+    font-size: 12px;
+    color: #888;
+}
+
+.plot-card-spacer {
+    flex: 1;
+}
+
+.plot-card-header .btn {
+    padding: 3px 10px;
+    font-size: 12px;
+}
+
+.plot-card-body {
+    position: relative;
+    height: 320px;
+}
+
+.plot-card-body canvas {
     display: block;
-    margin: 5px auto;
-    border-radius: 4px;
-    background: #f8f8f8;
-    cursor: default;
+    width: 100%;
+    height: 100%;
+    cursor: crosshair;
+}
+
+.plot-card-body canvas.panning {
+    cursor: grabbing;
+}
+
+.plot-card-hint {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #999;
+    font-size: 13px;
     pointer-events: none;
 }

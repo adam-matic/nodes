@@ -1,12 +1,12 @@
 # Modular Math Language - Web Interface
 
-A visual, web-based editor for the Modular Math Language with drag-and-drop node creation and real-time execution powered by Python backend.
+A visual, web-based editor for the Modular Math Language with drag-and-drop node creation. Programs compile and run entirely in the browser using the JavaScript solver (`assets/solver/`) — the page is fully static and works from any static file server.
 
 ## Features
 
 ### Visual Node Editor
 - **Drag-and-drop interface** for creating computational graphs
-- **Node types**: arithmetic (add, sub, mul, div), memory (mem), constants (const), comparisons (gt, lt, eq), I/O (input, output)
+- **Node types**: arithmetic (add, sub, mul, div), memory (mem), constants (const), comparisons (gt, lt, eq), I/O (input, output), parameters (param), plots (plot)
 - **Visual connections** between nodes with real-time value display
 - **Node parameters** - configurable values for memory initial states and constants
 - **Touch support** - optimized for tablets and mobile devices with pinch-to-zoom and pan
@@ -16,39 +16,36 @@ A visual, web-based editor for the Modular Math Language with drag-and-drop node
 - **Real-time synchronization** between visual and text representations
 - **Sample programs** included for learning
 
-### Execution Environment
-- **Step-by-step execution** with visual feedback
-- **Automatic execution** with configurable step timing
-- **Real-time signal values** displayed on connections
-- **Execution output** panel with detailed logging
+### Plots
+- **Plot panel** (Plots tab) with one chart per `plot` node in the graph
+- **Multiple traces** per chart - set the plot node's "Y Signals" to a comma-separated list
+- **Arbitrary X axis** - plot against the step counter or any signal (phase portraits)
+- **Autoscaling axes** with tick labels and grid
+- **Zoom and pan** - mouse wheel zooms around the cursor, drag pans, double-click (or the Fit button) resets to autoscale
+- **Live updates** while the simulation runs
+- **CSV and PNG export** per chart
 
-### Python Backend Integration
-- **Real compilation** using the language parser and tokenizer
-- **Actual VM execution** with correct signal values
-- **Real-time signal monitoring** during program execution
-- **REST API** for extensibility
+### Execution Environment
+- **In-browser execution** using the JavaScript port of the VM - no server round-trips
+- **Step-by-step execution** with visual feedback
+- **Real-time signal values** displayed on connections
+- **Execution output** panel with columnar variable values
 
 ## Quick Start
 
-**Option 1: Use the startup script**
-```bash
-cd web_interface
-./start.sh          # Defaults to port 8080
-./start.sh 9000      # Use custom port
-```
+Serve the directory with any static file server, for example:
 
-**Option 2: Start server directly**
 ```bash
 cd web_interface
-python server.py --port 8080
+python server.py --port 8080     # also provides the legacy REST API
+# or simply:
+python -m http.server 8080
 ```
 
 **Then open your browser to:**
 ```
 http://localhost:8080
 ```
-
-The interface requires the Python server to function - it will show "Server Disconnected" if the backend is not running.
 
 ## File Structure
 
@@ -58,8 +55,10 @@ web_interface/
 ├── assets/
 │   ├── style.css       # Visual styling and responsive design
 │   ├── app.js          # Core node editor functionality
-│   └── api.js          # Backend communication
-├── server.py           # Required Python backend server
+│   ├── api.js          # Local execution client (wraps the JS solver)
+│   ├── plot.js         # Plot panel (Plots tab)
+│   └── solver/         # JavaScript port of tokenizer, parser, and VM
+├── server.py           # Optional Python server (static files + legacy API)
 ├── start.sh            # Convenient startup script
 └── README.md           # This file
 ```
@@ -74,6 +73,8 @@ web_interface/
   - `const` - Constant value (0 inputs, 1 output, configurable value)
   - `gt`, `lt`, `eq` - Comparison operations (2 inputs, 1 output)
   - `input`, `output` - Module I/O connections
+  - `param` - Named parameter with default value
+  - `plot` - Records signals and shows them as a chart in the Plots tab
 
 ### Connecting Nodes
 - **Drag from output port** (right side) **to input port** (left side)
@@ -82,9 +83,16 @@ web_interface/
 
 ### Node Parameters
 - **Select a node** by clicking on it
-- **Click "Parameters"** button for configurable nodes (mem, const)
+- **Click "Params"** button for configurable nodes (mem, const, plot, param)
 - **Memory nodes**: Set initial value
 - **Constant nodes**: Set constant output value
+- **Plot nodes**: Set X signal (default `step`), Y signals (comma-separated wire names), and history size
+
+### Plotting
+1. Add a `plot` node and open its parameters
+2. Set **Y Signals** to one or more wire names from the graph, e.g. `current_value` or `pos, vel`
+3. Run the simulation and switch to the **Plots** tab (you can also switch first and watch the traces draw live)
+4. Use the mouse wheel to zoom, drag to pan, double-click or **Fit** to reset, **CSV**/**PNG** to export
 
 ### Execution
 1. **Compile** (optional): Validate code syntax
@@ -98,18 +106,14 @@ web_interface/
 - **Sample code** provided shows counter example
 - **Real-time sync** with visual representation
 
-## Backend Server API
+## Architecture
 
-The server provides REST endpoints for real compilation and execution:
+- **Visual node editor** built with HTML DOM nodes and SVG connections
+- **Plot panel** (`assets/plot.js`) rendering charts on canvas - hand-rolled, no dependencies
+- **Local execution client** (`assets/api.js`) with the same interface as the old HTTP client, backed by the JS solver
+- **JS solver** (`assets/solver/`) - a faithful port of the Python tokenizer, parser, and VM, validated against the golden fixtures (`node tests/js_solver_test.js`)
 
-- `GET /` - Serve the web interface
-- `GET /assets/*` - Serve static assets
-- `POST /api/compile` - Compile code and return validation results
-- `POST /api/step` - Execute one simulation step
-- `POST /api/run` - Start automatic execution
-- `POST /api/reset` - Reset execution state
-- `GET /api/status` - Get current execution status
-- `GET /api/signals` - Get current signal values
+The Python implementation remains the reference (CLI, test harness, language spec). `server.py` still exposes the original REST API (`/api/compile`, `/api/step`, ...) for tooling that wants server-side execution, but the web interface no longer uses it.
 
 ## Browser Compatibility
 
@@ -120,47 +124,20 @@ The server provides REST endpoints for real compilation and execution:
 
 Touch features require modern mobile browsers with pointer events support.
 
-## Architecture
-
-The web interface is built on a client-server architecture:
-
-### Frontend (Browser)
-- **Visual node editor** built with HTML5 Canvas and SVG
-- **Real-time UI updates** showing connection values and execution state
-- **API client** that communicates with the Python backend
-
-### Backend (Python Server)
-- **HTTP server** serving the web interface and API endpoints
-- **Language integration** using the tokenizer, parser, and VM
-- **Real execution** of modular math programs with actual computed values
-
-### Communication
-The frontend and backend communicate via REST API, allowing real-time compilation, execution, and signal monitoring.
-
 ## Development
 
 ### Adding New Node Types
 1. Update `getNodeInputs()` and `getNodeOutputs()` in `app.js`
 2. Add node class in `getNodeClass()` for styling
 3. Add to node menu in `index.html`
-4. Update backend server if needed for real execution
+4. Update code generation in `generateCodeFromGraph()` if the node produces wires
 
-### Extending API
-1. Add new endpoints in `server.py`
-2. Add corresponding methods in `api.js`
-3. Update the NodeEditor class to use new functionality
+### Testing
+- `node tests/js_solver_test.js` - golden-fixture tests for the JS solver
+- `node tests/js_plot_test.js` - unit tests for the plot panel's scaling/tick/history logic
 
-## Troubleshooting
-
-### Server Issues
-- **"Server Disconnected"**: Ensure Python server is running with `python server.py`
-- **Connection refused**: Check that server is running on the correct port (default 8080)
-- **Module import errors**: Ensure you're running from the correct directory with modular_math modules available
-
-### Interface Issues
+### Troubleshooting
 - **Nodes not connecting**: Ensure you're dragging from output (right) to input (left) ports
-- **Touch not working**: Ensure browser supports pointer events
+- **Empty plot**: Check that the plot node's Y signal names match wire names in the graph
 - **Compilation errors**: Check code syntax in the Code Editor tab
-
-### Debug Mode
-Open browser developer tools to see detailed logging and API communication.
+- Open browser developer tools to see detailed logging
