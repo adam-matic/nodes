@@ -13,7 +13,8 @@ from typing import Dict, List, Any, Tuple
 from pathlib import Path
 
 # Add the parent directory to the Python path so we can import modular_math
-sys.path.insert(0, str(Path(__file__).parent.parent))
+PROJECT_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from modular_math.parser import parse_file, ParseError
 from modular_math.vm import VirtualMachine
@@ -37,7 +38,7 @@ def run_single_test(test_case: Dict[str, Any]) -> Tuple[bool, str, Dict[str, Lis
         # Parse the module file
         module_file = test_case['module_file']
         if not module_file.startswith('/'):
-            module_file = f"/storage/emulated/0/dev/{module_file}"
+            module_file = str(PROJECT_ROOT / module_file)
 
         ast = parse_file(module_file)
 
@@ -185,7 +186,7 @@ def run_all_tests(verbose: bool = False, filter_pattern: str = None) -> Tuple[in
     Returns:
         (passed_count, total_count)
     """
-    test_dir = "/storage/emulated/0/dev/tests"
+    test_dir = PROJECT_ROOT / "tests"
     test_files = glob.glob(f"{test_dir}/*.json")
 
     if filter_pattern:
@@ -240,7 +241,7 @@ def main():
         # Run single test
         test_file = args.single
         if not test_file.startswith('/'):
-            test_file = f"/storage/emulated/0/dev/tests/{test_file}"
+            test_file = str(PROJECT_ROOT / "tests" / test_file)
         if not test_file.endswith('.json'):
             test_file += '.json'
 
@@ -268,7 +269,8 @@ def main():
 
         print(f"\n=== Test Summary ===")
         print(f"Passed: {passed}/{total}")
-        print(f"Success Rate: {100 * passed / total:.1f}%")
+        if total > 0:
+            print(f"Success Rate: {100 * passed / total:.1f}%")
 
         if passed == total:
             print("🎉 All tests passed!")

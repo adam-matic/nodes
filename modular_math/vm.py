@@ -123,12 +123,15 @@ class ModuleResolver:
     """Resolves and loads module dependencies."""
 
     def __init__(self):
+        import os
         self.loaded_modules: Dict[str, ModuleDefinition] = {}
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        examples_dir = os.path.join(project_root, 'examples')
         self.module_search_paths = [
-            '/storage/emulated/0/dev/examples/basic',
-            '/storage/emulated/0/dev/examples/control_systems',
-            '/storage/emulated/0/dev/examples/advanced',
-            '/storage/emulated/0/dev/examples'  # fallback
+            os.path.join(examples_dir, 'basic'),
+            os.path.join(examples_dir, 'control_systems'),
+            os.path.join(examples_dir, 'advanced'),
+            examples_dir  # fallback
         ]
 
     def load_module(self, module_name: str, module_path: Optional[str] = None, base_dir: Optional[str] = None) -> ModuleDefinition:
@@ -137,6 +140,7 @@ class ModuleResolver:
             return self.loaded_modules[module_name]
 
         # If explicit path is provided, use it
+        module_file = None
         if module_path:
             import os
             if not os.path.isabs(module_path):
@@ -144,12 +148,17 @@ class ModuleResolver:
                 if base_dir:
                     module_file = os.path.join(base_dir, module_path)
                 else:
-                    module_file = os.path.join('/storage/emulated/0/dev', module_path)
+                    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                    module_file = os.path.join(project_root, module_path)
             else:
                 module_file = module_path
-        else:
-            # Try to find module in search paths (legacy behavior)
-            module_file = None
+            # Fall back to search paths if the explicit path doesn't exist
+            # (e.g. code submitted from the web interface has no base directory)
+            if not os.path.exists(module_file):
+                module_file = None
+
+        if not module_file:
+            # Try to find module in search paths
             for search_path in self.module_search_paths:
                 candidate_file = f"{search_path}/{module_name}.txt"
                 try:
@@ -685,9 +694,10 @@ class VirtualMachine:
 
         # Determine how many steps to include
         result_steps = self.current_step
-        if self.halted:
-            # If halted, include the step that caused the halt
-            result_steps = self.current_step
+        if self.halted and self.current_step < self.max_steps:
+            # Halted by a HALT condition: current_step was not incremented,
+            # so include the step that triggered the halt
+            result_steps = self.current_step + 1
 
         # Always include step numbers
         if "$step" in self.signals:
