@@ -16,35 +16,42 @@
     <div class="container">
         <div class="main-panel">
             <div class="toolbar">
-                <div class="toolbar-row">
-                    <button id="add-node-btn" class="btn btn-secondary">Add Node</button>
-                    <button id="params-node-btn" class="btn btn-secondary" disabled>Params</button>
-                    <button id="flip-node-btn" class="btn btn-secondary" disabled>Flip</button>
-                    <button id="delete-btn" class="btn btn-danger" disabled>Del</button>
-                </div>
-                <div class="toolbar-row">
-                    <button id="new-graph-btn" class="btn btn-secondary">New</button>
-                    <button id="save-graph-btn" class="btn btn-primary">Save</button>
-                    <button id="load-graph-btn" class="btn btn-primary">Load</button>
-                    <button id="insert-module-btn" class="btn btn-secondary">Insert Module</button>
+                <div class="toolbar-group">
+                    <button id="new-graph-btn" class="btn" title="New graph"><span class="btn-icon">🗋</span>New</button>
+                    <button id="save-graph-btn" class="btn" title="Save graph (Ctrl+S)"><span class="btn-icon">💾</span>Save</button>
+                    <button id="load-graph-btn" class="btn" title="Load graph from file"><span class="btn-icon">📂</span>Load</button>
+                    <button id="insert-module-btn" class="btn" title="Insert a saved graph as a module"><span class="btn-icon">📦</span>Module</button>
                     <input type="file" id="file-input" accept=".mmgraph" style="display: none;">
                 </div>
-                <div class="toolbar-row">
-                    <label class="auto-compile-toggle">
+                <div class="toolbar-separator"></div>
+                <div class="toolbar-group">
+                    <button id="undo-btn" class="btn" title="Undo (Ctrl+Z)" disabled><span class="btn-icon">↩</span>Undo</button>
+                    <button id="redo-btn" class="btn" title="Redo (Ctrl+Shift+Z)" disabled><span class="btn-icon">↪</span>Redo</button>
+                </div>
+                <div class="toolbar-separator"></div>
+                <div class="toolbar-group">
+                    <button id="params-node-btn" class="btn" title="Edit node parameters" disabled><span class="btn-icon">⚙</span>Params</button>
+                    <button id="flip-node-btn" class="btn" title="Flip node horizontally" disabled><span class="btn-icon">⇄</span>Flip</button>
+                    <button id="delete-btn" class="btn btn-danger" title="Delete selection (Del)" disabled><span class="btn-icon">🗑</span>Delete</button>
+                </div>
+                <div class="toolbar-separator"></div>
+                <div class="toolbar-group">
+                    <button id="toolbar-run-btn" class="btn btn-primary" title="Run / stop (Ctrl+R)"><span class="btn-icon">▶</span>Run</button>
+                    <button id="toolbar-step-btn" class="btn" title="Execute one step"><span class="btn-icon">⏵</span>Step</button>
+                    <button id="toolbar-reset-btn" class="btn" title="Reset execution"><span class="btn-icon">↻</span>Reset</button>
+                    <span id="toolbar-step-counter" class="step-counter">Step: 0</span>
+                </div>
+                <div class="toolbar-spacer"></div>
+                <div class="toolbar-group">
+                    <label class="auto-compile-toggle" title="Recompile automatically when the graph changes">
                         <input type="checkbox" id="auto-compile-checkbox" checked>
                         <span>Auto-compile</span>
                     </label>
-                    <button id="validate-btn" class="btn btn-secondary">Validate</button>
+                    <button id="validate-btn" class="btn" title="Validate the graph now">Validate</button>
                     <div class="max-steps-control">
                         <label for="max-steps-input">Max Steps:</label>
                         <input type="number" id="max-steps-input" min="1" max="1000" value="10" step="1">
                     </div>
-                </div>
-                <div class="toolbar-row">
-                    <button id="toolbar-run-btn" class="btn btn-primary">Run</button>
-                    <button id="toolbar-step-btn" class="btn btn-secondary">Step</button>
-                    <button id="toolbar-reset-btn" class="btn btn-danger">Reset</button>
-                    <span id="toolbar-step-counter" class="step-counter">Step: 0</span>
                 </div>
             </div>
 
@@ -56,12 +63,49 @@
             </div>
 
             <div class="tab-content">
-                <!-- Visual Editor -->
-                <div id="visual-tab" class="node-editor">
-                    <div id="viewport" class="viewport">
-                        <svg id="connections" style="position: absolute; top: 0; left: 0; width: 5000px; height: 5000px; pointer-events: none; z-index: 1;">
-                            <!-- Connections will be drawn here -->
-                        </svg>
+                <!-- Visual Editor: node palette + canvas -->
+                <div id="visual-tab" class="visual-editor-layout">
+                    <aside id="node-palette" class="node-palette">
+                        <div class="palette-section">
+                            <div class="palette-heading">Arithmetic</div>
+                            <button class="palette-item arithmetic" draggable="true" data-type="add">add</button>
+                            <button class="palette-item arithmetic" draggable="true" data-type="sub">sub</button>
+                            <button class="palette-item arithmetic" draggable="true" data-type="mul">mul</button>
+                            <button class="palette-item arithmetic" draggable="true" data-type="div">div</button>
+                        </div>
+                        <div class="palette-section">
+                            <div class="palette-heading">Compare</div>
+                            <button class="palette-item comparison" draggable="true" data-type="gt">gt</button>
+                            <button class="palette-item comparison" draggable="true" data-type="lt">lt</button>
+                            <button class="palette-item comparison" draggable="true" data-type="eq">eq</button>
+                        </div>
+                        <div class="palette-section">
+                            <div class="palette-heading">State</div>
+                            <button class="palette-item memory" draggable="true" data-type="mem">mem</button>
+                        </div>
+                        <div class="palette-section">
+                            <div class="palette-heading">Sources</div>
+                            <button class="palette-item constant" draggable="true" data-type="const">const</button>
+                            <button class="palette-item io" draggable="true" data-type="input">input</button>
+                            <button class="palette-item parameter" draggable="true" data-type="param">param</button>
+                        </div>
+                        <div class="palette-section">
+                            <div class="palette-heading">Sinks</div>
+                            <button class="palette-item io" draggable="true" data-type="output">output</button>
+                            <button class="palette-item plot" draggable="true" data-type="plot">plot</button>
+                        </div>
+                        <div class="palette-hint">
+                            Click or drag to add a node.<br>
+                            Hold <kbd>Space</kbd> + drag to pan,<br>
+                            scroll to zoom.
+                        </div>
+                    </aside>
+                    <div id="editor-canvas" class="node-editor">
+                        <div id="viewport" class="viewport">
+                            <svg id="connections" style="position: absolute; top: 0; left: 0; width: 5000px; height: 5000px; pointer-events: none; z-index: 1;">
+                                <!-- Connections will be drawn here -->
+                            </svg>
+                        </div>
                     </div>
                 </div>
 
@@ -109,23 +153,6 @@ execution {
         </div>
     </div>
 
-    <!-- Context menu for adding nodes -->
-    <div id="node-menu" class="node-menu hidden">
-        <a href="#" class="node-menu-item" data-type="add">add</a>
-        <a href="#" class="node-menu-item" data-type="sub">sub</a>
-        <a href="#" class="node-menu-item" data-type="mul">mul</a>
-        <a href="#" class="node-menu-item" data-type="div">div</a>
-        <a href="#" class="node-menu-item" data-type="mem">mem</a>
-        <a href="#" class="node-menu-item" data-type="const">const</a>
-        <a href="#" class="node-menu-item" data-type="gt">gt</a>
-        <a href="#" class="node-menu-item" data-type="lt">lt</a>
-        <a href="#" class="node-menu-item" data-type="eq">eq</a>
-        <a href="#" class="node-menu-item" data-type="input">input</a>
-        <a href="#" class="node-menu-item" data-type="output">output</a>
-        <a href="#" class="node-menu-item" data-type="param">param</a>
-        <a href="#" class="node-menu-item" data-type="plot">plot</a>
-    </div>
-
     <!-- Node context menu -->
     <div id="node-context-menu" class="node-context-menu hidden">
         <!-- Dynamic content will be inserted here -->
@@ -147,5 +174,13 @@ execution {
     </div>
 
     <script src="assets/app.js"></script>
+    <script src="assets/editor/history.js"></script>
+    <script src="assets/editor/routing.js"></script>
+    <script src="assets/editor/graph.js"></script>
+    <script src="assets/editor/interaction.js"></script>
+    <script src="assets/editor/codegen.js"></script>
+    <script src="assets/editor/plotting.js"></script>
+    <script src="assets/editor/persistence.js"></script>
+    <script src="assets/editor/palette.js"></script>
 </body>
 </html>

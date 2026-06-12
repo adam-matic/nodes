@@ -61,13 +61,37 @@ one-off dev scripts and can be fixed if/when needed.
 
 ## Phase 3 — Desktop UI
 
-- [ ] Rework the stacked mobile toolbar into a single horizontal desktop
-      toolbar with icons and keyboard shortcuts (Del, Ctrl+S save, Ctrl+R run,
-      Space-drag pan).
-- [ ] Node palette sidebar instead of the "Add Node" popup.
-- [ ] Undo/redo (currently missing entirely).
-- [ ] Split the 3,200-line `NodeEditor` class in `app.js` into modules:
-      graph model, canvas/interaction, codegen, plotting, persistence.
+- [x] Single horizontal toolbar with icons, tooltips, and keyboard shortcuts:
+      Del (delete selection), Ctrl+S (save), Ctrl+R (run/stop),
+      Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y (undo/redo), Space-drag pan, and
+      mouse-wheel zoom centered on the cursor (the desktop previously had no
+      mouse zoom at all).
+- [x] Node palette sidebar (click to add at center, or drag onto the canvas)
+      replacing the "Add Node" popup.
+- [x] Undo/redo: snapshot stack of the serialized graph, checkpointed before
+      each mutation (`assets/editor/history.js`, unit-tested in
+      `tests/js_history_test.js`). Restores preserve node ids so parameter
+      bindings and module references survive — file loads now share the same
+      restore path, fixing bindings being silently remapped on load.
+- [x] Split the `NodeEditor` class into modules: kept one class but moved the
+      methods into `assets/editor/{graph,interaction,codegen,plotting,
+      persistence,history,palette}.js`, applied to the prototype via a tiny
+      mixin helper — no build step, `this` semantics unchanged.
+      `tests/js_editor_test.js` verifies every `this.method()` call site
+      resolves after the split. Fixed along the way: a duplicate
+      `deleteSelected` definition that shadowed the working one and called a
+      nonexistent method, and a global Backspace handler that broke typing in
+      the code editor.
+- [x] On-node action bar: selecting a node shows a small floating toolbar
+      above it with params / flip / duplicate / delete (duplicate is new;
+      the others mirror the main toolbar, which keeps working).
+- [x] Wire routing (`assets/editor/routing.js`): wires now leave and enter
+      horizontally on the side a port faces (flip-aware) as orthogonal
+      paths with rounded corners. The router scores candidate routes by
+      node-box crossings, then bends, then length — so feedback wires go
+      around the nodes instead of sweeping back through them, and wires
+      detour around nodes sitting on the direct path. Pure geometry,
+      unit-tested in `tests/js_routing_test.js`.
 
 ## Phase 4 — Later
 
