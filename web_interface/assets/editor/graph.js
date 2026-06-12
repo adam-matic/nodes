@@ -1,0 +1,676 @@
+/**
+ * Graph model: node and connection creation, deletion, and metadata.
+ *
+ * Part of the NodeEditor split (see docs/ROADMAP.md, Phase 3). Methods are
+ * defined in a plain class expression and copied onto NodeEditor.prototype
+ * by applyEditorMixin() (defined in app.js). Load after app.js.
+ */
+applyEditorMixin(class {
+    deleteSelectedNode() {
+        if (!this.selectedNodeForHighlight) return;
+
+        const nodeId = this.selectedNodeForHighlight.dataset.nodeId;
+        const nodeData = this.nodes.get(nodeId);
+
+        // If deleting a param node, remove all bindings to it
+        if (nodeData && nodeData.type === 'param') {
+            this.removeParameterBindings(nodeId);
+        }
+
+        // Remove all connections associated with this node
+        this.connections = this.connections.filter(connection => {
+            if (connection.from.nodeId === nodeId || connection.to.nodeId === nodeId) {
+                // Remove the connection element from DOM
+                if (connection.element) {
+                    connection.element.remove();
+                }
+                return false; // Remove from array
+            }
+            return true; // Keep in array
+        });
+
+        // Remove the node from DOM
+        this.selectedNodeForHighlight.remove();
+
+        // Remove from nodes map
+        this.nodes.delete(nodeId);
+        this.syncPlotPanel();
+
+        // Clear selection
+        this.selectedNodeForHighlight = null;
+        this.updateToolbarButtonStates();
+
+        // Trigger validation and auto-compilation
+        this.scheduleAutoCompile();
+    }
+    flipSelectedNode() {
+        if (!this.selectedNodeForHighlight) return;
+
+        const nodeId = this.selectedNodeForHighlight.dataset.nodeId;
+        const nodeData = this.nodes.get(nodeId);
+
+        if (!nodeData) return;
+
+        // Toggle flipped state
+        nodeData.isFlipped = !nodeData.isFlipped;
+
+        // Update visual appearance
+        if (nodeData.isFlipped) {
+            this.selectedNodeForHighlight.classList.add('flipped');
+        } else {
+            this.selectedNodeForHighlight.classList.remove('flipped');
+        }
+
+        // Update all connections to reflect the new port positions
+        this.updateConnections();
+    }
+    createNode(type, pos) {
+        const nodeId = `${type}_${this.nextNodeId++}`;
+        const parameters = this.getDefaultParameters(type);
+        const node = this.createNodeElement(type, nodeId, pos, parameters);
+
+        this.nodes.set(nodeId, {
+            id: nodeId,
+            type: type,
+            element: node,
+            pos: pos,
+            inputs: this.getNodeInputs(type),
+            outputs: this.getNodeOutputs(type),
+            value: null,
+            isFlipped: false,
+            parameters: parameters
+        });
+
+        document.getElementById('viewport').appendChild(node);
+
+        if (type === 'plot') {
+            this.syncPlotPanel();
+        }
+
+        // Trigger validation and auto-compilation after node creation
+        this.scheduleAutoCompile();
+
+        return nodeId;
+    }
+
+    createNodeElement(type, id, pos, parameters) {
+        const node = document.createElement('div');
+        node.className = `node ${this.getNodeClass(type)}`;
+        node.style.left = pos.x + 'px';
+        node.style.top = pos.y + 'px';
+        node.dataset.nodeId = id;
+
+        // Generate parameter display text
+        const paramText = this.getParameterDisplayText(type, parameters);
+
+        node.innerHTML = `
+            <div class="node-title">${type}</div>
+            <div class="node-params">${paramText}</div>
+        `;
+
+        // Add input ports
+        const inputs = this.getNodeInputs(type);
+        inputs.forEach((input, index) => {
+            const port = document.createElement('div');
+            port.className = 'port input';
+            port.style.top = `${20 + index * 15}px`;
+            port.dataset.portType = 'input';
+            port.dataset.portIndex = index;
+            node.appendChild(port);
+        });
+
+        // Add output ports
+        const outputs = this.getNodeOutputs(type);
+        outputs.forEach((output, index) => {
+            const port = document.createElement('div');
+            port.className = 'port output';
+            port.style.top = `${20 + index * 15}px`;
+            port.dataset.portType = 'output';
+            port.dataset.portIndex = index;
+            node.appendChild(port);
+        });
+
+        return node;
+    }
+
+    getParameterDisplayText(type, parameters) {
+        // Generate parameter display text based on node type
+        switch (type) {
+            case 'mem':
+                return `init: ${parameters.initialValue}`;
+            case 'const':
+                return `value: ${parameters.value}`;
+            case 'plot':
+                return `x: ${parameters.signalX}, y: ${parameters.signalY}`;
+            case 'param':
+                return `${parameters.name}: ${parameters.defaultValue}${parameters.alias ? ` → ${parameters.alias}` : ''}`;
+            default:
+                return ''; // No parameters to display
+        }
+    }
+
+    updateNodeParameterDisplay(nodeId) {
+        const nodeData = this.nodes.get(nodeId);
+        if (!nodeData) return;
+
+        const paramElement = nodeData.element.querySelector('.node-params');
+        if (paramElement) {
+            const paramText = this.getParameterDisplayText(nodeData.type, nodeData.parameters);
+            paramElement.textContent = paramText;
+        }
+    }
+
+    getNodeClass(type) {
+        if (['add', 'sub', 'mul', 'div'].includes(type)) return 'arithmetic';
+        if (type === 'mem') return 'memory';
+        if (type === 'const') return 'constant';
+        if (['gt', 'lt', 'eq', 'gte', 'lte'].includes(type)) return 'comparison';
+        if (['input', 'output'].includes(type)) return 'io';
+        if (type === 'param') return 'parameter';
+        if (type === 'plot') return 'plot';
+        return '';
+    }
+
+    getNodeInputs(type, nodeData = null) {
+        if (['add', 'sub', 'mul', 'div', 'gt', 'lt', 'eq'].includes(type)) return ['a', 'b'];
+        if (type === 'mem') return ['signal'];
+        if (type === 'output') return ['value'];
+        if (type === 'plot') return []; // Plot nodes don't need signal inputs, only params
+        if (type === 'param') return []; // Param nodes don't have inputs
+        if (type === 'module_instance' && nodeData) return nodeData.inputs || [];
+        return [];
+    }
+
+    getNodeOutputs(type, nodeData = null) {
+        if (type === 'plot') return []; // Plot nodes don't have outputs
+        if (type === 'output') return []; // Output nodes don't have outputs
+        if (type === 'module_instance' && nodeData) return nodeData.outputs || [];
+        return ['out'];
+    }
+
+    nodeHasParameters(type) {
+        // Define which node types have configurable parameters
+        return ['mem', 'const', 'plot', 'param'].includes(type);
+    }
+
+    getDefaultParameters(type) {
+        switch (type) {
+            case 'mem':
+                return { initialValue: 0 };
+            case 'const':
+                return { value: 1 };
+            case 'plot':
+                return {
+                    signalX: 'step',
+                    signalY: '',
+                    historySize: 1000
+                };
+            case 'param':
+                return {
+                    name: 'param1',
+                    defaultValue: 0,
+                    alias: ''
+                };
+            default:
+                return {};
+        }
+    }
+    createConnection(from, to) {
+        // Ensure proper direction (output to input)
+        if (from.portType === 'input') {
+            [from, to] = [to, from];
+        }
+
+        // Generate unique wire name
+        const wireName = this.generateWireName(from.nodeId, to.nodeId);
+
+        const connection = {
+            id: `conn_${this.connections.length}`,
+            wireName: wireName,  // NEW: Each wire has a unique name
+            from: from,
+            to: to,
+            value: null,
+            element: null
+        };
+
+        const pathElement = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        pathElement.classList.add('connection-line');
+        pathElement.dataset.connectionId = connection.id;
+
+        // Create invisible wider touch area for better touch targeting
+        const touchArea = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        touchArea.classList.add('connection-touch-area');
+        touchArea.dataset.connectionId = connection.id;
+        touchArea.style.stroke = 'transparent';
+        touchArea.style.strokeWidth = '20'; // Much wider invisible touch area
+        touchArea.style.fill = 'none';
+        touchArea.style.cursor = 'pointer';
+        touchArea.style.pointerEvents = 'stroke';
+
+        // Add event listeners to both the touch area and visible path
+        const addConnectionEvents = (element) => {
+            element.addEventListener('click', (e) => this.onConnectionClick(e, connection));
+            element.addEventListener('contextmenu', (e) => this.onConnectionRightClick(e, connection));
+
+            // Touch support for mobile devices
+            let touchStartTime = 0;
+            let touchStartPos = { x: 0, y: 0 };
+            let hasMoved = false;
+
+            element.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                touchStartTime = Date.now();
+                const touch = e.touches[0];
+                touchStartPos = { x: touch.clientX, y: touch.clientY };
+                hasMoved = false;
+            }, { passive: false });
+
+            element.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const dx = Math.abs(touch.clientX - touchStartPos.x);
+                const dy = Math.abs(touch.clientY - touchStartPos.y);
+
+                // If finger moved more than 10px, consider it a move gesture
+                if (dx > 10 || dy > 10) {
+                    hasMoved = true;
+                }
+            }, { passive: false });
+
+            element.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                // Don't process if the touch moved (was likely a pan/scroll gesture)
+                if (hasMoved) {
+                    return;
+                }
+
+                const touchDuration = Date.now() - touchStartTime;
+                const touch = e.changedTouches[0];
+
+                if (touchDuration > 500) {
+                    // Long press - show context menu
+                    this.showConnectionContextMenu(touch, connection);
+                } else {
+                    // Short tap - select and optionally delete
+                    this.onConnectionClick(e, connection);
+                }
+            }, { passive: false });
+        };
+
+        // Apply events to both visible line and invisible touch area
+        addConnectionEvents(pathElement);
+        addConnectionEvents(touchArea);
+
+        const textElement = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        textElement.classList.add('connection-value');
+        textElement.textContent = '';
+
+        const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        group.classList.add('connection');
+        group.appendChild(touchArea); // Add invisible touch area first (behind visible line)
+        group.appendChild(pathElement);
+        group.appendChild(textElement);
+
+        connection.element = group;
+        connection.pathElement = pathElement;
+        connection.touchArea = touchArea;
+        connection.textElement = textElement;
+
+        this.connections.push(connection);
+        document.getElementById('connections').appendChild(group);
+
+        this.updateConnection(connection);
+
+        // Trigger validation and auto-compilation
+        this.scheduleAutoCompile();
+    }
+
+    updateConnections() {
+        this.connections.forEach(conn => this.updateConnection(conn));
+    }
+
+    updateConnection(connection) {
+        // Get world positions of the ports
+        const fromNode = this.nodes.get(connection.from.nodeId);
+        const toNode = this.nodes.get(connection.to.nodeId);
+
+        if (!fromNode || !toNode) return;
+
+        // Calculate port positions in world coordinates
+        const fromPortY = fromNode.pos.y + 20 + connection.from.portIndex * 15 + 6; // center of port
+        const toPortY = toNode.pos.y + 20 + connection.to.portIndex * 15 + 6;
+
+        // Port offset from edge (ports are positioned at -6px for input, and at width-6px for output)
+        const portOffset = 6;
+
+        // Account for flipped nodes
+        let startX, endX;
+
+        if (connection.from.portType === 'output') {
+            // From node output port
+            if (fromNode.isFlipped) {
+                // When flipped, output ports are visually on the left
+                startX = fromNode.pos.x + portOffset;
+            } else {
+                // Normal: output ports on the right
+                startX = fromNode.pos.x + fromNode.element.offsetWidth - portOffset;
+            }
+        } else {
+            // From node input port
+            if (fromNode.isFlipped) {
+                // When flipped, input ports are visually on the right
+                startX = fromNode.pos.x + fromNode.element.offsetWidth - portOffset;
+            } else {
+                // Normal: input ports on the left
+                startX = fromNode.pos.x + portOffset;
+            }
+        }
+
+        if (connection.to.portType === 'input') {
+            // To node input port
+            if (toNode.isFlipped) {
+                // When flipped, input ports are visually on the right
+                endX = toNode.pos.x + toNode.element.offsetWidth - portOffset;
+            } else {
+                // Normal: input ports on the left
+                endX = toNode.pos.x + portOffset;
+            }
+        } else {
+            // To node output port
+            if (toNode.isFlipped) {
+                // When flipped, output ports are visually on the left
+                endX = toNode.pos.x + portOffset;
+            } else {
+                // Normal: output ports on the right
+                endX = toNode.pos.x + toNode.element.offsetWidth - portOffset;
+            }
+        }
+
+        const startY = fromPortY;
+        const endY = toPortY;
+
+        const path = this.createConnectionPath(startX, startY, endX, endY, fromNode, toNode);
+        connection.pathElement.setAttribute('d', path);
+
+        // Update the invisible touch area with the same path
+        if (connection.touchArea) {
+            connection.touchArea.setAttribute('d', path);
+        }
+
+        // Position wire label at midpoint showing "wireName=value"
+        const midX = (startX + endX) / 2;
+        const midY = (startY + endY) / 2;
+        connection.textElement.setAttribute('x', midX);
+        connection.textElement.setAttribute('y', midY - 5);
+
+        // Update text content to show wire name and value
+        const displayText = connection.value !== null ?
+            `${connection.wireName}=${connection.value}` :
+            connection.wireName;
+        connection.textElement.textContent = displayText;
+    }
+
+    createConnectionPath(x1, y1, x2, y2) {
+        const midX = (x1 + x2) / 2;
+        return `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
+    }
+    generateWireName(fromNodeId, toNodeId) {
+        // Generate wire name based ONLY on source node and port
+        // This ensures multiple connections from the same output share the same wire name
+        const fromNode = this.nodes.get(fromNodeId);
+
+        if (!fromNode) {
+            return `signal_${this.connections.length}`;
+        }
+
+        // Extract numeric ID from node ID
+        const fromNum = fromNodeId.split('_')[1] || '1';
+
+        // Generate a descriptive name based on the source node type
+        let wireName;
+
+        if (fromNode.type === 'input') {
+            wireName = `in_${fromNum}`;
+        } else if (fromNode.type === 'param') {
+            // Use the parameter name directly
+            wireName = fromNode.parameters?.name || `param_${fromNum}`;
+        } else if (fromNode.type === 'const') {
+            wireName = `const_${fromNum}_out`;
+        } else if (fromNode.type === 'mem') {
+            wireName = `mem_${fromNum}_out`;
+        } else if (['add', 'sub', 'mul', 'div'].includes(fromNode.type)) {
+            wireName = `${fromNode.type}_${fromNum}_result`;
+        } else if (['gt', 'lt', 'eq', 'gte', 'lte'].includes(fromNode.type)) {
+            wireName = `${fromNode.type}_${fromNum}_result`;
+        } else {
+            wireName = `${fromNode.type}_${fromNum}_out`;
+        }
+
+        return wireName;
+    }
+
+    getVariableName(nodeId, portIndex) {
+        const nodeData = this.nodes.get(nodeId);
+        if (!nodeData) return 'unknown';
+
+        // Clean up node ID for variable names
+        const cleanId = nodeId.replace(/[^a-zA-Z0-9_]/g, '_');
+        let suffix = cleanId.split('_')[1] || '1';
+
+        // Ensure suffix doesn't start with a number - prefix with 'n' if it does
+        if (/^\d/.test(suffix)) {
+            suffix = 'n' + suffix;
+        }
+
+        // Ensure variable names start with a letter and are valid identifiers
+        if (nodeData.type === 'const') {
+            return `const_${suffix}`;
+        }
+
+        return `${nodeData.type}_${suffix}`;
+    }
+    deleteConnection(connection) {
+        // Remove from connections array
+        const index = this.connections.indexOf(connection);
+        if (index > -1) {
+            this.connections.splice(index, 1);
+        }
+
+        // Remove DOM element
+        if (connection.element && connection.element.parentNode) {
+            connection.element.parentNode.removeChild(connection.element);
+        }
+
+        // Trigger validation and auto-compilation
+        this.scheduleAutoCompile();
+    }
+    renameWire(connection) {
+        const currentName = connection.wireName;
+        const newName = prompt(`Rename wire "${currentName}" to:`, currentName);
+
+        if (newName && newName.trim() !== '' && newName !== currentName) {
+            // Validate wire name (must be valid identifier)
+            const validName = newName.trim().replace(/[^a-zA-Z0-9_]/g, '_');
+
+            if (validName !== newName.trim()) {
+                alert(`Invalid wire name. Using sanitized name: ${validName}`);
+            }
+
+            // Check for duplicate wire names
+            const duplicateExists = this.connections.some(c => c.wireName === validName && c !== connection);
+            if (duplicateExists) {
+                alert(`Wire name "${validName}" already exists. Please choose a different name.`);
+                return;
+            }
+
+            // Update wire name
+            connection.wireName = validName;
+
+            // Update visual display
+            this.updateConnection(connection);
+
+            // Trigger recompilation
+            this.scheduleAutoCompile();
+        }
+    }
+
+    showConnectionInfo(connection) {
+        const fromNode = this.nodes.get(connection.from.nodeId);
+        const toNode = this.nodes.get(connection.to.nodeId);
+
+        const info = `Connection Info:
+Wire Name: ${connection.wireName}
+From: ${fromNode?.type || 'unknown'} (${connection.from.nodeId})
+To: ${toNode?.type || 'unknown'} (${connection.to.nodeId})
+Current Value: ${connection.value !== null ? connection.value : 'none'}`;
+
+        alert(info);
+    }
+    removeParameterBindings(paramNodeId) {
+        // Find all nodes that have bindings to this param node and remove them
+        this.nodes.forEach((nodeData, nodeId) => {
+            if (nodeData.parameterBindings) {
+                Object.keys(nodeData.parameterBindings).forEach(paramKey => {
+                    if (nodeData.parameterBindings[paramKey] === paramNodeId) {
+                        delete nodeData.parameterBindings[paramKey];
+                        this.updateParameterBindingBadge(nodeId);
+                    }
+                });
+            }
+        });
+    }
+    getExportableParameters(nodeType) {
+        // Define which parameters can be exported for each node type
+        const exportable = {
+            'const': [{ key: 'value', label: 'value' }],
+            'mem': [{ key: 'initialValue', label: 'initial value' }],
+            'plot': [
+                { key: 'signalX', label: 'X signal' },
+                { key: 'signalY', label: 'Y signal' },
+                { key: 'historySize', label: 'history size' }
+            ]
+        };
+
+        return exportable[nodeType] || [];
+    }
+
+    exportParameter(nodeId, paramKey) {
+        const nodeData = this.nodes.get(nodeId);
+        if (!nodeData) return;
+
+        // Close the context menu
+        this.hideNodeContextMenu();
+
+        // Create a param node near the original node
+        const offset = { x: 150, y: -50 };
+        const paramPos = {
+            x: nodeData.pos.x + offset.x,
+            y: nodeData.pos.y + offset.y
+        };
+
+        // Generate parameter name based on node type and param key
+        const paramName = `${nodeData.type}_${paramKey}_${nodeId.split('_')[1] || '1'}`;
+
+        // Get current parameter value as default
+        const currentValue = nodeData.parameters[paramKey] || 0;
+
+        // Create param node
+        const paramNodeId = this.createNode('param', paramPos);
+        const paramNodeData = this.nodes.get(paramNodeId);
+
+        if (paramNodeData) {
+            paramNodeData.parameters.name = paramName;
+            paramNodeData.parameters.defaultValue = currentValue;
+            paramNodeData.parameters.alias = '';
+
+            // Store binding metadata (no wires!)
+            if (!nodeData.parameterBindings) {
+                nodeData.parameterBindings = {};
+            }
+            nodeData.parameterBindings[paramKey] = paramNodeId;
+
+            // Update param node display
+            this.updateNodeParameterDisplay(paramNodeId);
+
+            // Add visual badge to the original node
+            this.updateParameterBindingBadge(nodeId);
+
+            this.addOutput(`Exported parameter "${paramKey}" as "${paramName}"\n`);
+
+            // Trigger auto-compile
+            this.scheduleAutoCompile();
+        }
+    }
+
+    updateParameterBindingBadge(nodeId) {
+        const nodeData = this.nodes.get(nodeId);
+        if (!nodeData) return;
+
+        const nodeElement = nodeData.element;
+
+        // Remove existing badge
+        const existingBadge = nodeElement.querySelector('.param-binding-badge');
+        if (existingBadge) {
+            existingBadge.remove();
+        }
+
+        // Count bound parameters
+        const bindingCount = nodeData.parameterBindings ? Object.keys(nodeData.parameterBindings).length : 0;
+
+        if (bindingCount > 0) {
+            const badge = document.createElement('div');
+            badge.className = 'param-binding-badge';
+            badge.textContent = bindingCount;
+            nodeElement.appendChild(badge);
+        }
+    }
+    createModuleInstanceElement(moduleName, id, pos, parameters, inputs, outputs) {
+        const node = document.createElement('div');
+        node.className = 'node module-instance';
+        node.style.left = pos.x + 'px';
+        node.style.top = pos.y + 'px';
+        node.dataset.nodeId = id;
+
+        node.innerHTML = `
+            <div class="node-title">📦 ${moduleName}</div>
+            <div class="node-params">${inputs.length} in, ${outputs.length} out</div>
+        `;
+
+        // Add input ports
+        inputs.forEach((input, index) => {
+            const port = document.createElement('div');
+            port.className = 'port input';
+            port.style.top = `${20 + index * 15}px`;
+            port.dataset.portType = 'input';
+            port.dataset.portIndex = index;
+            node.appendChild(port);
+        });
+
+        // Add output ports
+        outputs.forEach((output, index) => {
+            const port = document.createElement('div');
+            port.className = 'port output';
+            port.style.top = `${20 + index * 15}px`;
+            port.dataset.portType = 'output';
+            port.dataset.portIndex = index;
+            node.appendChild(port);
+        });
+
+        return node;
+    }
+
+    deleteSelected() {
+        if (this.selectedConnection) {
+            this.deleteConnection(this.selectedConnection);
+            this.selectedConnection = null;
+            this.updateToolbarButtonStates();
+            return;
+        }
+
+        if (this.selectedNodeForHighlight) {
+            this.deleteSelectedNode();
+        }
+    }
+});
