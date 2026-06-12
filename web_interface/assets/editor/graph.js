@@ -40,6 +40,7 @@ applyEditorMixin(class {
 
         // Clear selection
         this.selectedNodeForHighlight = null;
+        this.hideNodeActions();
         this.updateToolbarButtonStates();
 
         // Trigger validation and auto-compilation
@@ -67,6 +68,37 @@ applyEditorMixin(class {
 
         // Update all connections to reflect the new port positions
         this.updateConnections();
+    }
+    duplicateSelectedNode() {
+        if (!this.selectedNodeForHighlight) return;
+
+        const nodeId = this.selectedNodeForHighlight.dataset.nodeId;
+        const nodeData = this.nodes.get(nodeId);
+        if (!nodeData) return;
+
+        const pos = { x: nodeData.pos.x + 40, y: nodeData.pos.y + 40 };
+
+        let newId;
+        if (nodeData.type === 'module_instance' && nodeData.moduleDefinition) {
+            this.checkpoint();
+            newId = this.createModuleInstanceNode(nodeData.moduleDefinition, pos);
+        } else {
+            newId = this.createNode(nodeData.type, pos); // checkpoints internally
+            const copy = this.nodes.get(newId);
+            copy.parameters = JSON.parse(JSON.stringify(nodeData.parameters || {}));
+            copy.isFlipped = !!nodeData.isFlipped;
+            if (copy.isFlipped) {
+                copy.element.classList.add('flipped');
+            }
+            this.updateNodeParameterDisplay(newId);
+            if (copy.type === 'plot') {
+                this.syncPlotPanel(); // pick up the copied plot parameters
+            }
+        }
+
+        // Select the copy so it can be moved/edited right away
+        this.selectNode(this.nodes.get(newId).element);
+        this.scheduleAutoCompile();
     }
     createNode(type, pos, options = {}) {
         this.checkpoint();
@@ -347,82 +379,62 @@ applyEditorMixin(class {
     }
 
     updateConnections() {
-        this.connections.forEach(conn => this.updateConnection(conn));
+        // Obstacle rects are shared by every wire; compute them once
+        const obstacles = this.getObstacleRects();
+        this.connections.forEach(conn => this.updateConnection(conn, obstacles));
     }
 
-    updateConnection(connection) {
-        // Get world positions of the ports
+    /**
+     * World-space anchor of a port (at the node edge) plus the horizontal
+     * direction the port faces (+1 right, -1 left), accounting for flipped
+     * nodes.
+     */
+    getPortAnchor(nodeData, portType, portIndex) {
+        const y = nodeData.pos.y + 20 + portIndex * 15 + 6; // center of port
+        const onLeft = (portType === 'input') !== !!nodeData.isFlipped;
+        return onLeft
+            ? { x: nodeData.pos.x, y: y, dir: -1 }
+            : { x: nodeData.pos.x + nodeData.element.offsetWidth, y: y, dir: 1 };
+    }
+
+    /** Bounding boxes of all nodes, used as wire-routing obstacles. */
+    getObstacleRects() {
+        const rects = [];
+        this.nodes.forEach(nodeData => {
+            rects.push({
+                x: nodeData.pos.x,
+                y: nodeData.pos.y,
+                w: nodeData.element.offsetWidth,
+                h: nodeData.element.offsetHeight
+            });
+        });
+        return rects;
+    }
+
+    updateConnection(connection, obstacles = null) {
         const fromNode = this.nodes.get(connection.from.nodeId);
         const toNode = this.nodes.get(connection.to.nodeId);
 
         if (!fromNode || !toNode) return;
 
-        // Calculate port positions in world coordinates
-        const fromPortY = fromNode.pos.y + 20 + connection.from.portIndex * 15 + 6; // center of port
-        const toPortY = toNode.pos.y + 20 + connection.to.portIndex * 15 + 6;
+        // Route the wire so it leaves/enters on the side each port faces
+        // and detours around node boxes (see editor/routing.js)
+        const route = WireRouter.route({
+            start: this.getPortAnchor(fromNode, connection.from.portType, connection.from.portIndex),
+            end: this.getPortAnchor(toNode, connection.to.portType, connection.to.portIndex),
+            obstacles: obstacles || this.getObstacleRects()
+        });
 
-        // Port offset from edge (ports are positioned at -6px for input, and at width-6px for output)
-        const portOffset = 6;
-
-        // Account for flipped nodes
-        let startX, endX;
-
-        if (connection.from.portType === 'output') {
-            // From node output port
-            if (fromNode.isFlipped) {
-                // When flipped, output ports are visually on the left
-                startX = fromNode.pos.x + portOffset;
-            } else {
-                // Normal: output ports on the right
-                startX = fromNode.pos.x + fromNode.element.offsetWidth - portOffset;
-            }
-        } else {
-            // From node input port
-            if (fromNode.isFlipped) {
-                // When flipped, input ports are visually on the right
-                startX = fromNode.pos.x + fromNode.element.offsetWidth - portOffset;
-            } else {
-                // Normal: input ports on the left
-                startX = fromNode.pos.x + portOffset;
-            }
-        }
-
-        if (connection.to.portType === 'input') {
-            // To node input port
-            if (toNode.isFlipped) {
-                // When flipped, input ports are visually on the right
-                endX = toNode.pos.x + toNode.element.offsetWidth - portOffset;
-            } else {
-                // Normal: input ports on the left
-                endX = toNode.pos.x + portOffset;
-            }
-        } else {
-            // To node output port
-            if (toNode.isFlipped) {
-                // When flipped, output ports are visually on the left
-                endX = toNode.pos.x + portOffset;
-            } else {
-                // Normal: output ports on the right
-                endX = toNode.pos.x + toNode.element.offsetWidth - portOffset;
-            }
-        }
-
-        const startY = fromPortY;
-        const endY = toPortY;
-
-        const path = this.createConnectionPath(startX, startY, endX, endY, fromNode, toNode);
-        connection.pathElement.setAttribute('d', path);
+        connection.pathElement.setAttribute('d', route.path);
 
         // Update the invisible touch area with the same path
         if (connection.touchArea) {
-            connection.touchArea.setAttribute('d', path);
+            connection.touchArea.setAttribute('d', route.path);
         }
 
-        // Position wire label at midpoint showing "wireName=value"
-        const midX = (startX + endX) / 2;
-        const midY = (startY + endY) / 2;
-        connection.textElement.setAttribute('x', midX);
-        connection.textElement.setAttribute('y', midY - 5);
+        // Wire label on the longest run of the wire, showing "wireName=value"
+        connection.textElement.setAttribute('x', route.label.x);
+        connection.textElement.setAttribute('y', route.label.y - 5);
 
         // Update text content to show wire name and value
         const displayText = connection.value !== null ?
@@ -431,9 +443,11 @@ applyEditorMixin(class {
         connection.textElement.textContent = displayText;
     }
 
-    createConnectionPath(x1, y1, x2, y2) {
-        const midX = (x1 + x2) / 2;
-        return `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
+    /** Simple bezier for the temporary wire while dragging a new connection;
+     *  finished wires are routed by WireRouter (see updateConnection). */
+    createConnectionPath(x1, y1, x2, y2, dir = 1) {
+        const reach = Math.max(40, Math.abs(x2 - x1) / 2);
+        return `M ${x1} ${y1} C ${x1 + dir * reach} ${y1}, ${(x1 + x2) / 2} ${y2}, ${x2} ${y2}`;
     }
     generateWireName(fromNodeId, toNodeId) {
         // Generate wire name based ONLY on source node and port

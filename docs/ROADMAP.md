@@ -82,6 +82,16 @@ one-off dev scripts and can be fixed if/when needed.
       `deleteSelected` definition that shadowed the working one and called a
       nonexistent method, and a global Backspace handler that broke typing in
       the code editor.
+- [x] On-node action bar: selecting a node shows a small floating toolbar
+      above it with params / flip / duplicate / delete (duplicate is new;
+      the others mirror the main toolbar, which keeps working).
+- [x] Wire routing (`assets/editor/routing.js`): wires now leave and enter
+      horizontally on the side a port faces (flip-aware) as orthogonal
+      paths with rounded corners. The router scores candidate routes by
+      node-box crossings, then bends, then length — so feedback wires go
+      around the nodes instead of sweeping back through them, and wires
+      detour around nodes sitting on the direct path. Pure geometry,
+      unit-tested in `tests/js_routing_test.js`.
 
 ## Phase 4 — Later
 

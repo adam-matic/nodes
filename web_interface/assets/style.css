@@ -576,6 +576,47 @@ body {
     transform: scaleX(-1);
 }
 
+/* Floating action bar above the selected node */
+.node-actions {
+    position: absolute;
+    top: -36px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    background: white;
+    border: 1px solid #bbb;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    z-index: 30;
+    cursor: default;
+    white-space: nowrap;
+}
+
+/* Counter-mirror the bar on flipped nodes (the parent is scaleX(-1)) */
+.node.flipped .node-actions {
+    transform: translateX(-50%) scaleX(-1);
+}
+
+.node-actions button {
+    border: none;
+    background: transparent;
+    border-radius: 4px;
+    padding: 3px 7px;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.node-actions button:hover {
+    background: #E3F2FD;
+}
+
+.node-actions button.danger:hover {
+    background: #FFCDD2;
+}
+
 .node-title {
     font-weight: bold;
     text-align: center;

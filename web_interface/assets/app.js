@@ -41,6 +41,9 @@ class NodeEditor {
         this.longPressTimer = null;
         this.longPressNode = null;
 
+        // Floating action bar shown above the selected node
+        this.nodeActionsEl = null;
+
         // The canvas area of the visual tab (the palette sidebar sits beside it)
         this.canvasEl = document.getElementById('editor-canvas');
 
@@ -169,7 +172,56 @@ class NodeEditor {
         if (nodeElement) {
             nodeElement.classList.add('selected');
         }
+        this.showNodeActions(nodeElement);
         this.updateToolbarButtonStates();
+    }
+
+    /** Attach the floating action bar (params/flip/duplicate/delete) to the
+     *  selected node. The bar travels with the node since it's a child. */
+    showNodeActions(nodeElement) {
+        this.hideNodeActions();
+        if (!nodeElement) return;
+
+        const nodeData = this.nodes.get(nodeElement.dataset.nodeId);
+
+        const bar = document.createElement('div');
+        bar.className = 'node-actions';
+
+        const actions = [];
+        if (nodeData && this.nodeHasParameters(nodeData.type)) {
+            actions.push({ icon: '⚙', title: 'Edit parameters', handler: () => this.showParameterPanel() });
+        }
+        actions.push({ icon: '⇄', title: 'Flip horizontally', handler: () => this.flipSelectedNode() });
+        actions.push({ icon: '⧉', title: 'Duplicate', handler: () => this.duplicateSelectedNode() });
+        actions.push({ icon: '🗑', title: 'Delete (Del)', handler: () => this.deleteSelectedNode(), danger: true });
+
+        actions.forEach(({ icon, title, handler, danger }) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.textContent = icon;
+            btn.title = title;
+            if (danger) btn.classList.add('danger');
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                handler();
+            });
+            bar.appendChild(btn);
+        });
+
+        // Don't let presses on the bar start a node drag or canvas pan
+        // (and on touch, skipping the canvas handler lets the click fire)
+        bar.addEventListener('mousedown', (e) => e.stopPropagation());
+        bar.addEventListener('touchstart', (e) => e.stopPropagation());
+
+        nodeElement.appendChild(bar);
+        this.nodeActionsEl = bar;
+    }
+
+    hideNodeActions() {
+        if (this.nodeActionsEl) {
+            this.nodeActionsEl.remove();
+            this.nodeActionsEl = null;
+        }
     }
 
     clearSelection() {
@@ -177,6 +229,7 @@ class NodeEditor {
             this.selectedNodeForHighlight.classList.remove('selected');
             this.selectedNodeForHighlight = null;
         }
+        this.hideNodeActions();
 
         // Clear connection selection
         if (this.selectedConnection) {
@@ -487,6 +540,7 @@ class NodeEditor {
     }
 
     updateConnectionValues(signals) {
+        const obstacles = this.getObstacleRects();
         this.connections.forEach((conn, index) => {
             // Look up the signal value using the wire name
             let value = signals[conn.wireName];
@@ -506,7 +560,7 @@ class NodeEditor {
 
             conn.value = value;
             // Text is updated in updateConnection() which will be called after this
-            this.updateConnection(conn);
+            this.updateConnection(conn, obstacles);
             conn.element.classList.add('active');
         });
 

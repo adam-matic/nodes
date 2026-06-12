@@ -233,49 +233,8 @@ applyEditorMixin(class {
     }
 
     updateTempConnectionTouch(touch) {
-        if (!this.tempConnection || !this.connectionStart) return;
-
-        // Get start position in world coordinates
-        const startNode = this.nodes.get(this.connectionStart.nodeId);
-        if (!startNode) return;
-
-        const startPortY = startNode.pos.y + 20 + this.connectionStart.portIndex * 15 + 6;
-
-        // Port offset from edge
-        const portOffset = 6;
-
-        // Account for flipped nodes
-        let startX;
-        if (this.connectionStart.portType === 'output') {
-            // Output port
-            if (startNode.isFlipped) {
-                // When flipped, output ports are visually on the left
-                startX = startNode.pos.x + portOffset;
-            } else {
-                // Normal: output ports on the right
-                startX = startNode.pos.x + startNode.element.offsetWidth - portOffset;
-            }
-        } else {
-            // Input port
-            if (startNode.isFlipped) {
-                // When flipped, input ports are visually on the right
-                startX = startNode.pos.x + startNode.element.offsetWidth - portOffset;
-            } else {
-                // Normal: input ports on the left
-                startX = startNode.pos.x + portOffset;
-            }
-        }
-
-        const startY = startPortY;
-
-        // Convert touch position to world coordinates
-        const editorRect = this.canvasEl.getBoundingClientRect();
-        const screenEndX = touch.clientX - editorRect.left;
-        const screenEndY = touch.clientY - editorRect.top;
-        const worldEnd = this.screenToWorld(screenEndX, screenEndY);
-
-        const path = this.createConnectionPath(startX, startY, worldEnd.x, worldEnd.y, startNode, null);
-        this.tempConnection.setAttribute('d', path);
+        // Same logic as the mouse version; both only use clientX/clientY
+        this.updateTempConnection(touch);
     }
 
     finishConnectionTouch(touch, target) {
@@ -455,42 +414,16 @@ applyEditorMixin(class {
         const startNode = this.nodes.get(this.connectionStart.nodeId);
         if (!startNode) return;
 
-        const startPortY = startNode.pos.y + 20 + this.connectionStart.portIndex * 15 + 6;
+        const anchor = this.getPortAnchor(startNode,
+            this.connectionStart.portType, this.connectionStart.portIndex);
 
-        // Port offset from edge
-        const portOffset = 6;
-
-        // Account for flipped nodes
-        let startX;
-        if (this.connectionStart.portType === 'output') {
-            // Output port
-            if (startNode.isFlipped) {
-                // When flipped, output ports are visually on the left
-                startX = startNode.pos.x + portOffset;
-            } else {
-                // Normal: output ports on the right
-                startX = startNode.pos.x + startNode.element.offsetWidth - portOffset;
-            }
-        } else {
-            // Input port
-            if (startNode.isFlipped) {
-                // When flipped, input ports are visually on the right
-                startX = startNode.pos.x + startNode.element.offsetWidth - portOffset;
-            } else {
-                // Normal: input ports on the left
-                startX = startNode.pos.x + portOffset;
-            }
-        }
-
-        const startY = startPortY;
-
-        // Convert mouse position to world coordinates
+        // Convert pointer position to world coordinates
         const editorRect = this.canvasEl.getBoundingClientRect();
-        const screenEndX = e.clientX - editorRect.left;
-        const screenEndY = e.clientY - editorRect.top;
-        const worldEnd = this.screenToWorld(screenEndX, screenEndY);
+        const worldEnd = this.screenToWorld(
+            e.clientX - editorRect.left, e.clientY - editorRect.top);
 
-        const path = this.createConnectionPath(startX, startY, worldEnd.x, worldEnd.y, startNode, null);
+        const path = this.createConnectionPath(
+            anchor.x, anchor.y, worldEnd.x, worldEnd.y, anchor.dir);
         this.tempConnection.setAttribute('d', path);
     }
 

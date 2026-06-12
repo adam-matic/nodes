@@ -21,6 +21,7 @@ const ASSETS = path.join(PROJECT_ROOT, 'web_interface', 'assets');
 const SOURCES = [
     'app.js',
     'editor/history.js',
+    'editor/routing.js',
     'editor/graph.js',
     'editor/interaction.js',
     'editor/codegen.js',
