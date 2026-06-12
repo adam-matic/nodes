@@ -9,6 +9,8 @@ applyEditorMixin(class {
     deleteSelectedNode() {
         if (!this.selectedNodeForHighlight) return;
 
+        this.checkpoint();
+
         const nodeId = this.selectedNodeForHighlight.dataset.nodeId;
         const nodeData = this.nodes.get(nodeId);
 
@@ -51,6 +53,8 @@ applyEditorMixin(class {
 
         if (!nodeData) return;
 
+        this.checkpoint();
+
         // Toggle flipped state
         nodeData.isFlipped = !nodeData.isFlipped;
 
@@ -64,8 +68,21 @@ applyEditorMixin(class {
         // Update all connections to reflect the new port positions
         this.updateConnections();
     }
-    createNode(type, pos) {
-        const nodeId = `${type}_${this.nextNodeId++}`;
+    createNode(type, pos, options = {}) {
+        this.checkpoint();
+
+        let nodeId;
+        if (options.id) {
+            // Restoring a saved/undo state: keep the original id so
+            // references like parameter bindings stay valid
+            nodeId = options.id;
+            const num = parseInt(nodeId.split('_').pop(), 10);
+            if (!isNaN(num)) {
+                this.nextNodeId = Math.max(this.nextNodeId, num + 1);
+            }
+        } else {
+            nodeId = `${type}_${this.nextNodeId++}`;
+        }
         const parameters = this.getDefaultParameters(type);
         const node = this.createNodeElement(type, nodeId, pos, parameters);
 
@@ -216,6 +233,8 @@ applyEditorMixin(class {
         }
     }
     createConnection(from, to) {
+        this.checkpoint();
+
         // Ensure proper direction (output to input)
         if (from.portType === 'input') {
             [from, to] = [to, from];
@@ -472,6 +491,8 @@ applyEditorMixin(class {
         return `${nodeData.type}_${suffix}`;
     }
     deleteConnection(connection) {
+        this.checkpoint();
+
         // Remove from connections array
         const index = this.connections.indexOf(connection);
         if (index > -1) {
@@ -506,6 +527,7 @@ applyEditorMixin(class {
             }
 
             // Update wire name
+            this.checkpoint();
             connection.wireName = validName;
 
             // Update visual display

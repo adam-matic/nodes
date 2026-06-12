@@ -98,7 +98,8 @@ applyEditorMixin(class {
             if (!confirm) return;
         }
 
-        // Clear the graph
+        // Clear the graph (undoable)
+        this.checkpoint();
         this.clearGraph();
 
         // Reset graph metadata
@@ -140,8 +141,7 @@ applyEditorMixin(class {
 
                 if (this.isLoadingAsModule) {
                     // Insert as module instance
-                    const nodeEditor = document.getElementById('visual-tab');
-                    const editorRect = nodeEditor.getBoundingClientRect();
+                    const editorRect = this.canvasEl.getBoundingClientRect();
                     const centerX = editorRect.width / 2;
                     const centerY = editorRect.height / 2;
                     const pos = this.screenToWorld(centerX, centerY);
@@ -163,8 +163,8 @@ applyEditorMixin(class {
     }
 
     loadGraphFromFile(graphData) {
-        // Clear existing graph
-        this.clearGraph();
+        // Replacing the current graph is undoable
+        this.checkpoint();
 
         // Restore metadata
         this.graphName = graphData.metadata?.name || "untitled";
@@ -178,72 +178,10 @@ applyEditorMixin(class {
             this.updateViewportTransform();
         }
 
-        // Restore nodes
-        const nodeIdMap = new Map(); // Old ID -> New ID mapping
-        graphData.nodes.forEach(nodeData => {
-            const newNodeId = this.createNode(nodeData.type, nodeData.pos);
-            nodeIdMap.set(nodeData.id, newNodeId);
-
-            // Restore parameters
-            const newNodeData = this.nodes.get(newNodeId);
-            if (newNodeData) {
-                newNodeData.parameters = nodeData.parameters || {};
-                newNodeData.parameterBindings = nodeData.parameterBindings || {};
-                newNodeData.isFlipped = nodeData.isFlipped || false;
-                newNodeData.moduleName = nodeData.moduleName || null;
-                newNodeData.moduleDefinition = nodeData.moduleDefinition || null;
-
-                // Update visual appearance
-                if (newNodeData.isFlipped) {
-                    newNodeData.element.classList.add('flipped');
-                }
-                this.updateNodeParameterDisplay(newNodeId);
-
-                // Restore parameter binding badges
-                if (Object.keys(newNodeData.parameterBindings).length > 0) {
-                    this.updateParameterBindingBadge(newNodeId);
-                }
-            }
-        });
-
-        // Restore connections
-        graphData.connections.forEach(connData => {
-            const fromNodeId = nodeIdMap.get(connData.from.nodeId);
-            const toNodeId = nodeIdMap.get(connData.to.nodeId);
-
-            if (fromNodeId && toNodeId) {
-                const fromNode = this.nodes.get(fromNodeId);
-                const toNode = this.nodes.get(toNodeId);
-
-                if (fromNode && toNode) {
-                    const fromPort = fromNode.element.querySelectorAll('.port.output')[connData.from.portIndex];
-                    const toPort = toNode.element.querySelectorAll('.port.input')[connData.to.portIndex];
-
-                    if (fromPort && toPort) {
-                        const connection = {
-                            nodeId: fromNodeId,
-                            portType: connData.from.portType,
-                            portIndex: connData.from.portIndex,
-                            element: fromPort
-                        };
-
-                        const targetConnection = {
-                            nodeId: toNodeId,
-                            portType: connData.to.portType,
-                            portIndex: connData.to.portIndex,
-                            element: toPort
-                        };
-
-                        this.createConnection(connection, targetConnection);
-
-                        // Restore wire name
-                        const lastConn = this.connections[this.connections.length - 1];
-                        if (lastConn && connData.wireName) {
-                            lastConn.wireName = connData.wireName;
-                        }
-                    }
-                }
-            }
+        // Rebuild without recording per-node/per-connection undo entries
+        this.history.suspend(() => {
+            this.clearGraph();
+            this.restoreGraphData(graphData);
         });
 
         // Restore execution settings
@@ -251,13 +189,86 @@ applyEditorMixin(class {
             document.getElementById('max-steps-input').value = graphData.executionSettings.maxSteps || 10;
         }
 
+        this.addOutput(`Graph loaded: ${this.graphName}\n`);
+    }
+
+    /**
+     * Rebuild nodes and connections from serialized graph data, preserving
+     * the original node ids (so parameter bindings and module references
+     * stay valid). Used by file loading and undo/redo restores; the caller
+     * is responsible for clearing the graph first.
+     */
+    restoreGraphData(graphData) {
+        // Restore nodes
+        graphData.nodes.forEach(nodeData => {
+            let nodeId;
+            if (nodeData.type === 'module_instance' && nodeData.moduleDefinition) {
+                nodeId = this.createModuleInstanceNode(
+                    nodeData.moduleDefinition, nodeData.pos, nodeData.id);
+            } else {
+                nodeId = this.createNode(nodeData.type, nodeData.pos, { id: nodeData.id });
+            }
+
+            // Restore parameters
+            const newNodeData = this.nodes.get(nodeId);
+            if (newNodeData) {
+                newNodeData.parameters = nodeData.parameters || {};
+                newNodeData.parameterBindings = nodeData.parameterBindings || {};
+                newNodeData.isFlipped = nodeData.isFlipped || false;
+                newNodeData.moduleName = nodeData.moduleName || newNodeData.moduleName || null;
+                newNodeData.moduleDefinition = nodeData.moduleDefinition || newNodeData.moduleDefinition || null;
+
+                // Update visual appearance
+                if (newNodeData.isFlipped) {
+                    newNodeData.element.classList.add('flipped');
+                }
+                this.updateNodeParameterDisplay(nodeId);
+
+                // Restore parameter binding badges
+                if (Object.keys(newNodeData.parameterBindings).length > 0) {
+                    this.updateParameterBindingBadge(nodeId);
+                }
+            }
+        });
+
+        // Restore connections
+        graphData.connections.forEach(connData => {
+            const fromNode = this.nodes.get(connData.from.nodeId);
+            const toNode = this.nodes.get(connData.to.nodeId);
+            if (!fromNode || !toNode) return;
+
+            const fromPort = fromNode.element.querySelectorAll('.port.output')[connData.from.portIndex];
+            const toPort = toNode.element.querySelectorAll('.port.input')[connData.to.portIndex];
+            if (!fromPort || !toPort) return;
+
+            this.createConnection(
+                {
+                    nodeId: connData.from.nodeId,
+                    portType: connData.from.portType,
+                    portIndex: connData.from.portIndex,
+                    element: fromPort
+                },
+                {
+                    nodeId: connData.to.nodeId,
+                    portType: connData.to.portType,
+                    portIndex: connData.to.portIndex,
+                    element: toPort
+                }
+            );
+
+            // Restore wire name
+            const lastConn = this.connections[this.connections.length - 1];
+            if (lastConn && connData.wireName) {
+                lastConn.wireName = connData.wireName;
+                this.updateConnection(lastConn);
+            }
+        });
+
         // Plot node parameters were restored after node creation
         this.syncPlotPanel();
 
         // Trigger auto-compile
         this.scheduleAutoCompile();
-
-        this.addOutput(`Graph loaded: ${this.graphName}\n`);
     }
 
     clearGraph() {
@@ -284,6 +295,15 @@ applyEditorMixin(class {
     }
 
     loadGraphAsModuleInstance(graphData, position) {
+        this.checkpoint();
+        const nodeId = this.createModuleInstanceNode(graphData, position);
+        const moduleName = this.nodes.get(nodeId).moduleName;
+        this.addOutput(`Module instance created: ${moduleName}\n`);
+    }
+
+    /** Create a module-instance node from a saved graph definition.
+     *  Pass an explicit id when restoring a serialized state. */
+    createModuleInstanceNode(graphData, position, id = null) {
         // Analyze the graph to determine inputs, outputs, and parameters
         const inputNodes = [];
         const outputNodes = [];
@@ -299,9 +319,18 @@ applyEditorMixin(class {
             }
         });
 
-        // Create module instance node ID
+        // Create module instance node ID (reuse the given one when restoring)
         const moduleName = graphData.metadata?.name || 'module';
-        const nodeId = `${moduleName}_${this.nextNodeId++}`;
+        let nodeId;
+        if (id) {
+            nodeId = id;
+            const num = parseInt(id.split('_').pop(), 10);
+            if (!isNaN(num)) {
+                this.nextNodeId = Math.max(this.nextNodeId, num + 1);
+            }
+        } else {
+            nodeId = `${moduleName}_${this.nextNodeId++}`;
+        }
 
         // Create custom node inputs/outputs based on the graph
         const inputs = inputNodes.map((node, idx) => `in_${idx}`);
@@ -334,6 +363,6 @@ applyEditorMixin(class {
         // Trigger validation and auto-compilation
         this.scheduleAutoCompile();
 
-        this.addOutput(`Module instance created: ${moduleName}\n`);
+        return nodeId;
     }
 });

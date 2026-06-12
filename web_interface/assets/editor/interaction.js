@@ -7,6 +7,14 @@
  */
 applyEditorMixin(class {
     onMouseDown(e) {
+        // Space-drag or middle-button drag pans the canvas
+        if (this.spaceDown || e.button === 1) {
+            e.preventDefault();
+            this.mousePanning = true;
+            this.startPan(e);
+            return;
+        }
+
         if (e.target.classList.contains('port')) {
             this.startConnection(e);
         } else if (e.target.closest('.node')) {
@@ -29,7 +37,9 @@ applyEditorMixin(class {
     }
 
     onMouseMove(e) {
-        if (this.isDragging) {
+        if (this.mousePanning) {
+            this.updatePan(e);
+        } else if (this.isDragging) {
             this.updateDrag(e);
         } else if (this.isConnecting) {
             this.updateTempConnection(e);
@@ -37,11 +47,43 @@ applyEditorMixin(class {
     }
 
     onMouseUp(e) {
-        if (this.isConnecting) {
+        if (this.mousePanning) {
+            this.mousePanning = false;
+            this.finishPan();
+        } else if (this.isConnecting) {
             this.finishConnection(e);
         } else if (this.isDragging) {
             this.finishDrag(e);
         }
+    }
+
+    // Mouse-wheel zoom centered on the cursor
+    onWheel(e) {
+        e.preventDefault();
+
+        const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+        const newZoom = Math.max(0.1, Math.min(5, this.zoom * factor));
+        if (newZoom === this.zoom) return;
+
+        // Keep the world point under the cursor fixed while zooming
+        const rect = this.canvasEl.getBoundingClientRect();
+        const screenX = e.clientX - rect.left;
+        const screenY = e.clientY - rect.top;
+        const world = this.screenToWorld(screenX, screenY);
+
+        this.zoom = newZoom;
+        this.panX = screenX - world.x * this.zoom;
+        this.panY = screenY - world.y * this.zoom;
+        this.clampPan();
+
+        this.updateViewportTransform();
+        this.updateConnections();
+    }
+
+    clampPan() {
+        // Same limits as touch panning: a little headroom up, lots elsewhere
+        this.panY = Math.max(-5000, Math.min(100, this.panY));
+        this.panX = Math.max(-5000, Math.min(5000, this.panX));
     }
     // Touch event handlers
     onTouchStart(e) {
@@ -129,6 +171,7 @@ applyEditorMixin(class {
         const node = target.closest('.node');
         if (!node) return;
 
+        this.checkpoint(); // pre-move positions (deduped if nothing moves)
         this.isDragging = true;
         this.selectedNode = node;
 
@@ -144,7 +187,7 @@ applyEditorMixin(class {
     updateDragTouch(touch) {
         if (!this.selectedNode) return;
 
-        const nodeEditor = document.getElementById('visual-tab');
+        const nodeEditor = this.canvasEl;
         const editorRect = nodeEditor.getBoundingClientRect();
 
         // Convert screen coordinates to world coordinates
@@ -226,7 +269,7 @@ applyEditorMixin(class {
         const startY = startPortY;
 
         // Convert touch position to world coordinates
-        const editorRect = document.getElementById('visual-tab').getBoundingClientRect();
+        const editorRect = this.canvasEl.getBoundingClientRect();
         const screenEndX = touch.clientX - editorRect.left;
         const screenEndY = touch.clientY - editorRect.top;
         const worldEnd = this.screenToWorld(screenEndX, screenEndY);
@@ -281,16 +324,7 @@ applyEditorMixin(class {
 
         this.panX += dx;
         this.panY += dy;
-
-        // Apply pan limits to prevent panning too far
-        // Limit upward panning (positive panY values)
-        const maxPanY = 100; // Allow only 100px upward pan
-        const minPanY = -5000; // Allow panning down
-        const maxPanX = 5000; // Allow panning right
-        const minPanX = -5000; // Allow panning left
-
-        this.panY = Math.max(minPanY, Math.min(maxPanY, this.panY));
-        this.panX = Math.max(minPanX, Math.min(maxPanX, this.panX));
+        this.clampPan();
 
         this.lastPanPosition = { x: touch.clientX, y: touch.clientY };
         this.updateViewportTransform();
@@ -350,6 +384,7 @@ applyEditorMixin(class {
         const node = e.target.closest('.node');
         if (!node) return;
 
+        this.checkpoint(); // pre-move positions (deduped if nothing moves)
         this.isDragging = true;
         this.selectedNode = node;
 
@@ -365,7 +400,7 @@ applyEditorMixin(class {
     updateDrag(e) {
         if (!this.selectedNode) return;
 
-        const nodeEditor = document.getElementById('visual-tab');
+        const nodeEditor = this.canvasEl;
         const editorRect = nodeEditor.getBoundingClientRect();
 
         // Convert screen coordinates to world coordinates
@@ -450,7 +485,7 @@ applyEditorMixin(class {
         const startY = startPortY;
 
         // Convert mouse position to world coordinates
-        const editorRect = document.getElementById('visual-tab').getBoundingClientRect();
+        const editorRect = this.canvasEl.getBoundingClientRect();
         const screenEndX = e.clientX - editorRect.left;
         const screenEndY = e.clientY - editorRect.top;
         const worldEnd = this.screenToWorld(screenEndX, screenEndY);

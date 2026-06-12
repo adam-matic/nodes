@@ -33,14 +33,29 @@ class NodeEditor {
         this.initialPinchDistance = 0;
         this.initialZoom = 1;
 
+        // Space-drag panning (desktop)
+        this.spaceDown = false;
+        this.mousePanning = false;
+
         // Node context menu state
         this.longPressTimer = null;
         this.longPressNode = null;
 
+        // The canvas area of the visual tab (the palette sidebar sits beside it)
+        this.canvasEl = document.getElementById('editor-canvas');
+
         // Plot panel (Plots tab) — one chart per plot node in the graph
         this.plotPanel = new PlotPanel(document.getElementById('plots-container'));
 
+        // Undo/redo (snapshots of the serialized graph; see editor/history.js)
+        this.history = new UndoHistory({
+            capture: () => this.captureState(),
+            restore: (state) => this.restoreState(state),
+            onChange: () => this.updateUndoRedoButtons()
+        });
+
         this.setupEventListeners();
+        this.setupPalette();
         this.createSampleNodes();
 
         // API integration
@@ -61,35 +76,21 @@ class NodeEditor {
         });
 
         // Node editor events
-        const nodeEditor = document.getElementById('visual-tab');
+        const nodeEditor = this.canvasEl;
         nodeEditor.addEventListener('mousedown', (e) => this.onMouseDown(e));
         nodeEditor.addEventListener('mousemove', (e) => this.onMouseMove(e));
         nodeEditor.addEventListener('mouseup', (e) => this.onMouseUp(e));
         nodeEditor.addEventListener('contextmenu', (e) => e.preventDefault()); // Prevent browser context menu
+        nodeEditor.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
 
         // Touch events for mobile support
         nodeEditor.addEventListener('touchstart', (e) => this.onTouchStart(e), { passive: false });
         nodeEditor.addEventListener('touchmove', (e) => this.onTouchMove(e), { passive: false });
         nodeEditor.addEventListener('touchend', (e) => this.onTouchEnd(e), { passive: false });
 
-
-        // Context menu
-        document.getElementById('node-menu').addEventListener('click', (e) => {
-            if (e.target.classList.contains('node-menu-item')) {
-                this.createNode(e.target.dataset.type, this.menuPos);
-                this.hideNodeMenu();
-            }
-        });
-
-        // Hide menu on click outside
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('#node-menu') && !e.target.closest('#add-node-btn')) {
-                this.hideNodeMenu();
-            }
-        });
-
         // Toolbar controls
-        document.getElementById('add-node-btn').addEventListener('click', (e) => this.showNodeMenuFromButton(e));
+        document.getElementById('undo-btn').addEventListener('click', () => this.undo());
+        document.getElementById('redo-btn').addEventListener('click', () => this.redo());
         document.getElementById('params-node-btn').addEventListener('click', () => this.showParameterPanel());
         document.getElementById('flip-node-btn').addEventListener('click', () => this.flipSelectedNode());
         document.getElementById('delete-btn').addEventListener('click', () => this.deleteSelected());
@@ -133,6 +134,7 @@ class NodeEditor {
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => this.onKeyDown(e));
+        document.addEventListener('keyup', (e) => this.onKeyUp(e));
     }
     switchTab(tabName) {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -156,28 +158,6 @@ class NodeEditor {
         }
     }
 
-    showNodeMenuFromButton(e) {
-        const menu = document.getElementById('node-menu');
-        const button = e.target;
-
-        // Position menu below the button (since it's now at the top)
-        const buttonRect = button.getBoundingClientRect();
-        menu.style.left = buttonRect.left + 'px';
-        menu.style.top = (buttonRect.bottom + 5) + 'px';
-
-        // Set default position for new nodes (center of viewport)
-        const nodeEditor = document.getElementById('visual-tab');
-        const editorRect = nodeEditor.getBoundingClientRect();
-        const centerX = editorRect.width / 2;
-        const centerY = editorRect.height / 2;
-        this.menuPos = this.screenToWorld(centerX, centerY);
-
-        menu.classList.remove('hidden');
-    }
-
-    hideNodeMenu() {
-        document.getElementById('node-menu').classList.add('hidden');
-    }
     selectNode(nodeElement) {
         // Clear previous selection
         if (this.selectedNodeForHighlight) {
@@ -303,6 +283,8 @@ class NodeEditor {
 
         if (!nodeData) return;
 
+        this.checkpoint();
+
         // Save parameters based on node type
         switch (nodeData.type) {
             case 'mem':
@@ -375,6 +357,9 @@ class NodeEditor {
                 { nodeId: memId, portType: 'output', portIndex: 0, element: this.nodes.get(memId).element.querySelector('.port.output') },
                 { nodeId: outputId, portType: 'input', portIndex: 0, element: this.nodes.get(outputId).element.querySelector('.port.input') }
             );
+
+            // The sample graph is the baseline, not an undoable action
+            this.history.reset();
         }, 100);
     }
     async compileCode() {
@@ -779,6 +764,7 @@ class NodeEditor {
         const target = e.target;
         const isTyping = target && (target.tagName === 'INPUT' ||
             target.tagName === 'TEXTAREA' || target.isContentEditable);
+        const mod = e.ctrlKey || e.metaKey;
 
         if (e.key === 'Escape') {
             this.clearSelection();
@@ -786,12 +772,61 @@ class NodeEditor {
             return;
         }
 
+        // Ctrl+S / Ctrl+R work everywhere (the browser defaults are never
+        // what you want inside the editor)
+        if (mod && (e.key === 's' || e.key === 'S')) {
+            e.preventDefault();
+            this.saveGraph();
+            return;
+        }
+        if (mod && (e.key === 'r' || e.key === 'R')) {
+            e.preventDefault();
+            this.toggleRun();
+            return;
+        }
+
         if (isTyping) return;
+
+        if (mod && (e.key === 'z' || e.key === 'Z')) {
+            e.preventDefault();
+            if (e.shiftKey) {
+                this.redo();
+            } else {
+                this.undo();
+            }
+            return;
+        }
+        if (mod && (e.key === 'y' || e.key === 'Y')) {
+            e.preventDefault();
+            this.redo();
+            return;
+        }
+
+        // Hold Space to pan the canvas by dragging
+        if (e.code === 'Space') {
+            e.preventDefault(); // don't scroll the page or trigger focused buttons
+            if (!e.repeat) {
+                this.spaceDown = true;
+                this.canvasEl.classList.add('space-pan');
+            }
+            return;
+        }
 
         // Delete key - delete selected node or connection
         if (e.key === 'Delete' || e.key === 'Backspace') {
             e.preventDefault();
             this.deleteSelected();
+        }
+    }
+
+    onKeyUp(e) {
+        if (e.code === 'Space') {
+            this.spaceDown = false;
+            this.canvasEl.classList.remove('space-pan');
+            if (this.mousePanning) {
+                this.mousePanning = false;
+                this.finishPan();
+            }
         }
     }
 }

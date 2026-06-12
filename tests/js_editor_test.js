@@ -20,11 +20,13 @@ const ASSETS = path.join(PROJECT_ROOT, 'web_interface', 'assets');
 // Load order must match the <script> tags in index.html
 const SOURCES = [
     'app.js',
+    'editor/history.js',
     'editor/graph.js',
     'editor/interaction.js',
     'editor/codegen.js',
     'editor/plotting.js',
     'editor/persistence.js',
+    'editor/palette.js',
 ].map(rel => path.join(ASSETS, rel));
 
 let passed = 0;
@@ -70,6 +72,15 @@ check('prototype has a substantial method set', methods.size > 80,
 // Every `this.someName(` in the sources must be a prototype method.
 // (Calls through instance properties like `this.plotPanel.sync(...)` don't
 // match this pattern, so they are not flagged.)
+const UndoHistory = vm.runInContext('UndoHistory', sandbox);
+check('UndoHistory class is defined', typeof UndoHistory === 'function');
+const allowed = new Set([
+    ...methods,
+    // UndoHistory methods and its function-valued constructor options
+    ...Object.getOwnPropertyNames(UndoHistory.prototype),
+    'capture', 'restoreFn', 'onChange',
+]);
+
 const allSource = SOURCES.map(f => fs.readFileSync(f, 'utf8')).join('\n');
 const callSites = new Set();
 for (const match of allSource.matchAll(/this\.(\w+)\(/g)) {
@@ -79,7 +90,7 @@ check('found this.method() call sites to verify', callSites.size > 50,
     `only ${callSites.size} call sites`);
 
 for (const name of callSites) {
-    check(`this.${name}() resolves to a prototype method`, methods.has(name));
+    check(`this.${name}() resolves to a known method`, allowed.has(name));
 }
 
 console.log(`\n=== Test Summary ===`);

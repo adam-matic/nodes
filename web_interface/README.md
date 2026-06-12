@@ -5,11 +5,14 @@ A visual, web-based editor for the Modular Math Language with drag-and-drop node
 ## Features
 
 ### Visual Node Editor
-- **Drag-and-drop interface** for creating computational graphs
+- **Node palette sidebar** - click to add a node, or drag it onto the canvas to place it
 - **Node types**: arithmetic (add, sub, mul, div), memory (mem), constants (const), comparisons (gt, lt, eq), I/O (input, output), parameters (param), plots (plot)
 - **Visual connections** between nodes with real-time value display
 - **Node parameters** - configurable values for memory initial states and constants
-- **Touch support** - optimized for tablets and mobile devices with pinch-to-zoom and pan
+- **Undo/redo** for all graph edits (add/move/delete/connect/rename/parameters)
+- **Desktop navigation** - hold Space and drag (or middle-button drag) to pan, mouse wheel to zoom around the cursor
+- **Keyboard shortcuts** - Del (delete selection), Ctrl+S (save), Ctrl+R (run/stop), Ctrl+Z / Ctrl+Shift+Z (undo/redo)
+- **Touch support** - tablets and mobile devices keep pinch-to-zoom and pan
 
 ### Code Editor
 - **Syntax-aware text editor** for direct code editing
@@ -54,7 +57,15 @@ web_interface/
 ├── index.html          # Main web interface
 ├── assets/
 │   ├── style.css       # Visual styling and responsive design
-│   ├── app.js          # Core node editor functionality
+│   ├── app.js          # NodeEditor core (UI wiring, selection, execution)
+│   ├── editor/         # NodeEditor modules (mixins on the same class)
+│   │   ├── graph.js        # node/connection model operations
+│   │   ├── interaction.js  # mouse/touch input, drag, pan/zoom, menus
+│   │   ├── codegen.js      # validation + code generation
+│   │   ├── plotting.js     # plot panel sync
+│   │   ├── persistence.js  # serialization, save/load, module instances
+│   │   ├── history.js      # undo/redo stack
+│   │   └── palette.js      # node palette sidebar
 │   ├── api.js          # Local execution client (wraps the JS solver)
 │   ├── plot.js         # Plot panel (Plots tab)
 │   └── solver/         # JavaScript port of tokenizer, parser, and VM
@@ -66,7 +77,7 @@ web_interface/
 ## Usage Guide
 
 ### Creating Nodes
-- **Visual Editor**: Click "Add Node" button or double-tap empty space
+- **Visual Editor**: Click a type in the palette sidebar (adds at the center of the view) or drag it onto the canvas
 - **Available Types**:
   - `add`, `sub`, `mul`, `div` - Arithmetic operations (2 inputs, 1 output)
   - `mem` - Memory/delay element (1 input, 1 output, configurable initial value)
@@ -127,14 +138,16 @@ Touch features require modern mobile browsers with pointer events support.
 ## Development
 
 ### Adding New Node Types
-1. Update `getNodeInputs()` and `getNodeOutputs()` in `app.js`
+1. Update `getNodeInputs()` and `getNodeOutputs()` in `assets/editor/graph.js`
 2. Add node class in `getNodeClass()` for styling
-3. Add to node menu in `index.html`
-4. Update code generation in `generateCodeFromGraph()` if the node produces wires
+3. Add a palette entry in `index.html`
+4. Update code generation in `assets/editor/codegen.js` (`generateCodeFromGraph()`) if the node produces wires
 
 ### Testing
 - `node tests/js_solver_test.js` - golden-fixture tests for the JS solver
 - `node tests/js_plot_test.js` - unit tests for the plot panel's scaling/tick/history logic
+- `node tests/js_history_test.js` - unit tests for the undo/redo stack
+- `node tests/js_editor_test.js` - structural checks that the NodeEditor module split is complete
 
 ### Troubleshooting
 - **Nodes not connecting**: Ensure you're dragging from output (right) to input (left) ports
