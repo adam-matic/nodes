@@ -21,6 +21,7 @@
                     <button id="save-graph-btn" class="btn" title="Save graph (Ctrl+S)"><span class="btn-icon">💾</span>Save</button>
                     <button id="load-graph-btn" class="btn" title="Load graph from file"><span class="btn-icon">📂</span>Load</button>
                     <button id="insert-module-btn" class="btn" title="Insert a saved graph as a module"><span class="btn-icon">📦</span>Module</button>
+                    <button id="projects-btn" class="btn" title="My projects (saved in this browser)"><span class="btn-icon">📚</span>Projects</button>
                     <input type="file" id="file-input" accept=".mmgraph" style="display: none;">
                 </div>
                 <div class="toolbar-separator"></div>
@@ -161,6 +162,22 @@ execution {
         <!-- Dynamic content will be inserted here -->
     </div>
 
+    <!-- My Projects panel (local IndexedDB library) -->
+    <div id="projects-panel" class="projects-panel hidden">
+        <div class="parameter-header">
+            <h3>My Projects</h3>
+            <button id="close-projects-btn" class="close-btn">×</button>
+        </div>
+        <div class="projects-body">
+            <div class="projects-toolbar">
+                <button id="save-to-library-btn" class="btn btn-primary"><span class="btn-icon">💾</span>Save current graph</button>
+                <span id="projects-current" class="projects-current"></span>
+            </div>
+            <div id="projects-list" class="projects-list"></div>
+            <p class="projects-note">Projects are saved in this browser only (IndexedDB). Use Save/Load to export or import <code>.mmgraph</code> files.</p>
+        </div>
+    </div>
+
     <!-- Parameter panel -->
     <div id="parameter-panel" class="parameter-panel hidden">
         <div class="parameter-header">
@@ -180,11 +197,13 @@ execution {
     <script src="assets/editor/history.js"></script>
     <script src="assets/editor/routing.js"></script>
     <script src="assets/editor/library.js"></script>
+    <script src="assets/editor/storage.js"></script>
     <script src="assets/editor/graph.js"></script>
     <script src="assets/editor/interaction.js"></script>
     <script src="assets/editor/codegen.js"></script>
     <script src="assets/editor/plotting.js"></script>
     <script src="assets/editor/persistence.js"></script>
     <script src="assets/editor/palette.js"></script>
+    <script src="assets/editor/projects.js"></script>
 </body>
 </html>

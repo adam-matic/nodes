@@ -149,3 +149,53 @@ one-off dev scripts and can be fixed if/when needed.
 
 Touch support stays as-is (isolated in its own handlers) but receives no
 further investment.
+
+## Phase 5 — Web editor with users
+
+Goal: host the editor as a website (starting on GitHub Pages) where people can
+save and revisit their work. Built **local-first**: everything below the
+"server" line runs as a static page with no backend and no new dependencies,
+and the storage is hidden behind a small interface so a server backend can slot
+in later without touching the editor UI.
+
+How NoiseCraft (the closest sibling project) does the multi-user part, for
+reference: a plain-JS, no-build frontend talks to a **small Node.js + SQLite
+server** over a tiny JSON API; accounts are username + hashed password with
+session tokens; projects are stored server-side with permalinks and a public
+browse/fork gallery. That requires an always-on server, so it is *not*
+hostable on GitHub Pages — which is why the roadmap stays static as long as
+possible and only crosses the server line when cross-device sync or a public
+gallery is actually wanted.
+
+### Static (GitHub Pages, no backend, no accounts)
+
+- [ ] **Local project library (IndexedDB).** A per-browser "My Projects"
+      store behind a small async interface — `list()`, `get(id)`, `put(p)`,
+      `remove(id)` — with an IndexedDB implementation and an in-memory fallback
+      (also the test double). Projects are `{ id, name, data, created,
+      modified }` where `data` is the existing `serializeGraph()` output. UI:
+      open / save / rename / duplicate / delete, plus debounced autosave of the
+      currently open project. File import/export stays as the escape hatch.
+      *(IndexedDB, not localStorage: graphs are structured and can grow past
+      localStorage's ~5 MB string cap.)*
+- [ ] **Shareable links.** Serialize + compress the graph into the URL hash
+      (native `CompressionStream`, still zero-dependency) for read-only / forkable
+      links; `?load=<url>` opens a `.mmgraph` hosted anywhere (e.g. a Gist).
+      Fall back to file export for graphs too large for a URL.
+
+### Server line (requires a backend; deferred)
+
+- [ ] **Accounts + cloud save.** First real backend. The static frontend stays
+      put and calls a JSON API over CORS; the same storage interface gains a
+      remote implementation (its methods `fetch()` instead of hitting
+      IndexedDB), so the editor is unchanged and existing local projects can be
+      uploaded in one pass. Backend options, roughly in order of fit with this
+      project's zero-dependency ethos: a small self-hosted Node + SQLite server
+      (the NoiseCraft model; Node 22+ has built-in `node:sqlite` and
+      `crypto.scrypt`, so near zero-dependency), a managed service like Supabase
+      (fastest to multi-user, adds a vendor), or GitHub OAuth with files stored
+      as Gists/commits (neat for a dev audience, but still needs a tiny
+      serverless piece for the OAuth secret — not purely static).
+- [ ] **Sharing & community.** Public publish, a browse/gallery page, fork
+      from gallery, permalinks — a straightforward extension once the accounts
+      DB exists.
