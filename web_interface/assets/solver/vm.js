@@ -229,6 +229,12 @@
             throw new Error(`Cannot extract signal name from ${expr.kind}`);
         }
 
+        /** Flattened signal name for a dotted reference within `prefix`.
+         *  e.g. instance `s` output `sum` at prefix '' -> 's.sum'. */
+        resolveDotAccess(expr, prefix) {
+            return `${prefix}${this.getSignalName(expr)}`;
+        }
+
         flattenModule(module, prefix, overriddenParams = null) {
             const fullPrefix = prefix ? `${prefix}.` : '';
 
@@ -322,6 +328,13 @@
 
             } else if (expr.kind === 'ModuleInstantiation') {
                 this.createModuleInstantiation(expr, outputSignal, prefix);
+
+            } else if (expr.kind === 'DotAccess') {
+                // Reading one output of a multi-output module instance: the
+                // instance's outputs are flattened to "<instance>.<output>"
+                // signals, so copy from there.
+                const sourceSignal = this.resolveDotAccess(expr, prefix);
+                this.operations.push(new Operation('copy', 'builtin', [sourceSignal], outputSignal));
 
             } else {
                 throw new Error(`Unsupported expression type: ${expr.kind}`);
@@ -419,6 +432,14 @@
 
             if (expr.kind === 'StepVariable') {
                 return '$step';
+            }
+
+            if (expr.kind === 'DotAccess') {
+                const signalName = this.resolveDotAccess(expr, prefix);
+                if (!(signalName in this.signals)) {
+                    this.signals[signalName] = new Signal(signalName);
+                }
+                return signalName;
             }
 
             if (expr.kind === 'NumberLiteral') {

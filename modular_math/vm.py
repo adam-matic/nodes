@@ -285,6 +285,11 @@ class VirtualMachine:
         else:
             raise ValueError(f"Cannot extract signal name from {type(expr)}")
 
+    def _resolve_dot_access(self, expr: 'DotAccess', prefix: str) -> str:
+        """Flattened signal name for a dotted reference within `prefix`.
+        e.g. instance `s` output `sum` at prefix '' -> 's.sum'."""
+        return f"{prefix}{self._get_signal_name(expr)}"
+
     def _flatten_module(self, module: ModuleDefinition, prefix: str, overridden_params: Optional[Set[str]] = None):
         """Flatten a module into operations and signals."""
         full_prefix = f"{prefix}." if prefix else ""
@@ -402,6 +407,19 @@ class VirtualMachine:
 
         elif isinstance(expr, ModuleInstantiation):
             self._create_module_instantiation(expr, output_signal, prefix)
+
+        elif isinstance(expr, DotAccess):
+            # Reading one output of a multi-output module instance: the
+            # instance's outputs are flattened to "<instance>.<output>"
+            # signals, so copy from there.
+            source_signal = self._resolve_dot_access(expr, prefix)
+            op = Operation(
+                name="copy",
+                op_type="builtin",
+                inputs=[source_signal],
+                output=output_signal
+            )
+            self.operations.append(op)
 
         else:
             raise ValueError(f"Unsupported expression type: {type(expr)}")
@@ -530,6 +548,12 @@ class VirtualMachine:
 
         elif isinstance(expr, StepVariable):
             return "$step"
+
+        elif isinstance(expr, DotAccess):
+            signal_name = self._resolve_dot_access(expr, prefix)
+            if signal_name not in self.signals:
+                self.signals[signal_name] = Signal(signal_name)
+            return signal_name
 
         elif isinstance(expr, NumberLiteral):
             # Create a temporary signal for the constant
