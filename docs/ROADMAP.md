@@ -107,6 +107,11 @@ one-off dev scripts and can be fixed if/when needed.
         `parameters.paramOverrides` and applied in
         `generateModuleDefinitionCode` (falls back to scanning
         `moduleDefinition` for files saved before `paramSpecs` existed).
+      - Fixed two latent codegen bugs in the inserted-module path that made it
+        emit code the language rejects: a two-token `output name wire`
+        declaration (the grammar's `output` takes a single signal name) and
+        positional module-call arguments (the VM binds params by name).
+        Regression-tested in `tests/js_module_instance_test.js`.
 
 - [x] Richer node library — surfaces the existing stdlib modules as a palette
       "library" rather than adding new VM primitives (the VM's only primitives

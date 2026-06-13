@@ -282,20 +282,23 @@ applyEditorMixin(class {
                 code += `    ${conn.wireName} = ${fromNode.libraryName}(${args.join(', ')})\n`;
                 addedWires.add(conn.wireName);
             } else if (fromNode.type === 'module_instance') {
-                // Find input wires to the module instance
+                // Find input wires to the module instance. Module calls require
+                // named arguments (the VM binds params by name), so emit
+                // inputName=wire for each connected input.
                 const nodeInputs = this.getNodeInputs(fromNode.type, fromNode);
-                const inputWires = [];
+                const args = [];
 
                 nodeInputs.forEach((inputName, inputIndex) => {
                     const inputConn = this.connections.find(c =>
                         c.to.nodeId === fromNode.id && c.to.portIndex === inputIndex
                     );
-                    inputWires[inputIndex] = inputConn ? inputConn.wireName : '0';
+                    if (inputConn) {
+                        args.push(`${inputName}=${inputConn.wireName}`);
+                    }
                 });
 
-                const params = inputWires.join(', ');
                 const moduleName = fromNode.moduleName || 'module';
-                code += `    ${conn.wireName} = ${moduleName}(${params})\n`;
+                code += `    ${conn.wireName} = ${moduleName}(${args.join(', ')})\n`;
                 addedWires.add(conn.wireName);
             }
         });
@@ -538,12 +541,14 @@ applyEditorMixin(class {
             }
         });
 
-        // Output declarations using the port name from the output node
-        outputNodes.forEach((outputNode, idx) => {
+        // Output declarations. The language's `output` takes a single signal
+        // name (the internal wire feeding the output node) — there is no
+        // `output name wire` form. The output node's own port name only labels
+        // the instance's port; it does not appear here.
+        outputNodes.forEach((outputNode) => {
             const connection = graphData.connections.find(c => c.to.nodeId === outputNode.id);
-            const portName = (outputNode.parameters?.name || '').trim() || `out_${idx}`;
             if (connection) {
-                code += `    output ${portName} ${connection.wireName}\n`;
+                code += `    output ${connection.wireName}\n`;
             }
         });
 
