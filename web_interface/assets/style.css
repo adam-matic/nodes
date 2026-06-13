@@ -293,6 +293,7 @@ body {
 .palette-item.io { border-color: #F44336; background: #FFEBEE; }
 .palette-item.parameter { border-color: #FF5722; background: #FFEBE9; }
 .palette-item.plot { border-color: #00BCD4; background: #E0F7FA; }
+.palette-item.library { border-color: #673AB7; background: #EDE7F6; }
 
 .palette-hint {
     font-size: 11px;

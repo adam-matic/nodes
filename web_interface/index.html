@@ -94,6 +94,9 @@
                             <button class="palette-item io" draggable="true" data-type="output">output</button>
                             <button class="palette-item plot" draggable="true" data-type="plot">plot</button>
                         </div>
+                        <!-- Library sections (signal sources, filters, control) are
+                             generated from NodeLibrary.REGISTRY by setupPalette() -->
+                        <div id="library-sections"></div>
                         <div class="palette-hint">
                             Click or drag to add a node.<br>
                             Hold <kbd>Space</kbd> + drag to pan,<br>
@@ -176,6 +179,7 @@ execution {
     <script src="assets/app.js"></script>
     <script src="assets/editor/history.js"></script>
     <script src="assets/editor/routing.js"></script>
+    <script src="assets/editor/library.js"></script>
     <script src="assets/editor/graph.js"></script>
     <script src="assets/editor/interaction.js"></script>
     <script src="assets/editor/codegen.js"></script>

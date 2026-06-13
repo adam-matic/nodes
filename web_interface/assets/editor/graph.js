@@ -79,7 +79,18 @@ applyEditorMixin(class {
         const pos = { x: nodeData.pos.x + 40, y: nodeData.pos.y + 40 };
 
         let newId;
-        if (nodeData.type === 'module_instance' && nodeData.moduleDefinition) {
+        if (nodeData.type === 'module_instance' && nodeData.isLibrary) {
+            this.checkpoint();
+            newId = this.createLibraryNode(nodeData.libraryName, pos);
+            const copy = this.nodes.get(newId);
+            if (copy) {
+                copy.parameters.paramOverrides =
+                    JSON.parse(JSON.stringify(nodeData.parameters.paramOverrides || {}));
+                copy.isFlipped = !!nodeData.isFlipped;
+                if (copy.isFlipped) copy.element.classList.add('flipped');
+                this.updateNodeParameterDisplay(newId);
+            }
+        } else if (nodeData.type === 'module_instance' && nodeData.moduleDefinition) {
             this.checkpoint();
             newId = this.createModuleInstanceNode(nodeData.moduleDefinition, pos);
         } else {
@@ -139,6 +150,62 @@ applyEditorMixin(class {
         // Trigger validation and auto-compilation after node creation
         this.scheduleAutoCompile();
 
+        return nodeId;
+    }
+
+    /**
+     * Create a library node: a module-instance node backed by a stdlib module
+     * (see editor/library.js). Ports and parameters are introspected from the
+     * module source; the code generator emits `import <name>` + a named-arg
+     * call (codegen.js). Pass an explicit id when restoring a saved state.
+     */
+    createLibraryNode(libraryName, pos, id = null) {
+        let spec;
+        try {
+            spec = NodeLibrary.introspect(libraryName);
+        } catch (e) {
+            this.addOutput(`Cannot add library node "${libraryName}": ${e.message}\n`);
+            return null;
+        }
+
+        this.checkpoint();
+
+        let nodeId;
+        if (id) {
+            nodeId = id;
+            const num = parseInt(id.split('_').pop(), 10);
+            if (!isNaN(num)) this.nextNodeId = Math.max(this.nextNodeId, num + 1);
+        } else {
+            nodeId = `${libraryName}_${this.nextNodeId++}`;
+        }
+
+        // Params with no source default fall back to 0 so the field is editable
+        const paramSpecs = spec.params.map(p => ({
+            name: p.name,
+            defaultValue: p.defaultValue === null ? 0 : p.defaultValue
+        }));
+        const parameters = { paramSpecs, paramOverrides: {} };
+
+        const node = this.createModuleInstanceElement(
+            libraryName, nodeId, pos, parameters, spec.inputs, spec.outputs);
+
+        this.nodes.set(nodeId, {
+            id: nodeId,
+            type: 'module_instance',
+            isLibrary: true,
+            libraryName: libraryName,
+            moduleSource: spec.source,
+            element: node,
+            pos: pos,
+            inputs: spec.inputs,
+            outputs: spec.outputs,
+            value: null,
+            isFlipped: false,
+            parameters: parameters
+        });
+
+        document.getElementById('viewport').appendChild(node);
+        this.scheduleAutoCompile();
         return nodeId;
     }
 
@@ -494,6 +561,14 @@ applyEditorMixin(class {
             wireName = `${fromNode.type}_${fromNum}_result`;
         } else if (['gt', 'lt', 'eq', 'gte', 'lte'].includes(fromNode.type)) {
             wireName = `${fromNode.type}_${fromNum}_result`;
+        } else if (fromNode.type === 'module_instance') {
+            // Node ids like "low_pass_filter_5" have underscores in the base
+            // name, so use the trailing counter for uniqueness
+            const counter = fromNodeId.split('_').pop();
+            const base = fromNode.isLibrary
+                ? fromNode.libraryName
+                : (fromNode.moduleName || 'module');
+            wireName = `${base}_${counter}_out`;
         } else {
             wireName = `${fromNode.type}_${fromNum}_out`;
         }
