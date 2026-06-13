@@ -23,12 +23,14 @@ const SOURCES = [
     'editor/history.js',
     'editor/routing.js',
     'editor/library.js',
+    'editor/storage.js',
     'editor/graph.js',
     'editor/interaction.js',
     'editor/codegen.js',
     'editor/plotting.js',
     'editor/persistence.js',
     'editor/palette.js',
+    'editor/projects.js',
 ].map(rel => path.join(ASSETS, rel));
 
 let passed = 0;
@@ -76,11 +78,18 @@ check('prototype has a substantial method set', methods.size > 80,
 // match this pattern, so they are not flagged.)
 const UndoHistory = vm.runInContext('UndoHistory', sandbox);
 check('UndoHistory class is defined', typeof UndoHistory === 'function');
+// ProjectStorage's store classes (storage.js) have their own `this` methods
+// (e.g. this._store/this._await); they are not editor-prototype methods.
+const ProjectStorage = vm.runInContext('ProjectStorage', sandbox);
+check('ProjectStorage is defined', typeof ProjectStorage === 'object');
 const allowed = new Set([
     ...methods,
     // UndoHistory methods and its function-valued constructor options
     ...Object.getOwnPropertyNames(UndoHistory.prototype),
     'capture', 'restoreFn', 'onChange',
+    // Project store internal methods (own classes, not the editor prototype)
+    ...Object.getOwnPropertyNames(ProjectStorage.IndexedDbProjectStore.prototype),
+    ...Object.getOwnPropertyNames(ProjectStorage.MemoryProjectStore.prototype),
 ]);
 
 const allSource = SOURCES.map(f => fs.readFileSync(f, 'utf8')).join('\n');

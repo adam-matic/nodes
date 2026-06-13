@@ -398,6 +398,10 @@ applyEditorMixin(class {
         return paramNode.parameters.name || 'param1';
     }
     scheduleAutoCompile() {
+        // Persist the open library project on any graph change. Independent of
+        // the auto-compile toggle, so it runs before that early return.
+        this.scheduleLibraryAutosave();
+
         if (!this.autoCompileEnabled) return;
 
         // Clear existing timeout

@@ -105,8 +105,10 @@ applyEditorMixin(class {
         this.checkpoint();
         this.clearGraph();
 
-        // Reset graph metadata
+        // Reset graph metadata. A new graph is not tied to a library project
+        // until it is saved, so autosave stops touching the previous one.
         this.graphName = 'untitled';
+        this.currentProjectId = null;
         this.createdTimestamp = new Date().toISOString();
 
         // Reset viewport
@@ -168,6 +170,11 @@ applyEditorMixin(class {
     loadGraphFromFile(graphData) {
         // Replacing the current graph is undoable
         this.checkpoint();
+
+        // The loaded graph is not (yet) a library project. openProject() sets
+        // currentProjectId again right after calling this; a plain file import
+        // leaves it null so autosave won't overwrite a previously open project.
+        this.currentProjectId = null;
 
         // Restore metadata
         this.graphName = graphData.metadata?.name || "untitled";

@@ -57,8 +57,18 @@ class NodeEditor {
             onChange: () => this.updateUndoRedoButtons()
         });
 
+        // Local project library (IndexedDB; see editor/storage.js, projects.js).
+        // Async init — methods await projectStoreReady before using the store.
+        this.projectStore = null;
+        this.currentProjectId = null;
+        this.librarySaveTimeout = null;
+        this.projectStoreReady = ProjectStorage.createProjectStore()
+            .then(store => { this.projectStore = store; })
+            .catch(err => console.warn('Project storage unavailable:', err));
+
         this.setupEventListeners();
         this.setupPalette();
+        this.setupProjects();
         this.createSampleNodes();
 
         // API integration
