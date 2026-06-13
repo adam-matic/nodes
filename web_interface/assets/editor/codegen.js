@@ -157,21 +157,24 @@ applyEditorMixin(class {
             return '';
         }
 
-        // First, collect all module definitions from module instances
+        // Collect module definitions; first instance of each module name wins for overrides
         const moduleDefinitions = new Map();
-        this.nodes.forEach((nodeData, nodeId) => {
+        this.nodes.forEach((nodeData) => {
             if (nodeData.type === 'module_instance' && nodeData.moduleDefinition) {
                 const moduleName = nodeData.moduleName || 'module';
                 if (!moduleDefinitions.has(moduleName)) {
-                    moduleDefinitions.set(moduleName, nodeData.moduleDefinition);
+                    moduleDefinitions.set(moduleName, {
+                        def: nodeData.moduleDefinition,
+                        overrides: nodeData.parameters?.paramOverrides || {}
+                    });
                 }
             }
         });
 
         // Generate module definitions first
         let code = '';
-        moduleDefinitions.forEach((moduleDef, moduleName) => {
-            code += this.generateModuleDefinitionCode(moduleDef, moduleName);
+        moduleDefinitions.forEach(({ def, overrides }, moduleName) => {
+            code += this.generateModuleDefinitionCode(def, moduleName, overrides);
             code += '\n\n';
         });
 
@@ -414,33 +417,33 @@ applyEditorMixin(class {
             this.addOutput(`⚠ Graph validation found ${this.validationErrors.length} issue(s)\n`);
         }
     }
-    generateModuleDefinitionCode(graphData, moduleName) {
-        // Generate code for a module definition from a saved graph
+    generateModuleDefinitionCode(graphData, moduleName, paramOverrides = {}) {
         let code = `module ${moduleName} {\n`;
         const addedWires = new Set();
 
-        // Find input, output, and param nodes to generate declarations
         const inputNodes = graphData.nodes.filter(n => n.type === 'input');
         const outputNodes = graphData.nodes.filter(n => n.type === 'output');
         const paramNodes = graphData.nodes.filter(n => n.type === 'param');
 
-        // Generate param declarations first
+        // Param declarations, with any per-instance overrides applied
         paramNodes.forEach((paramNode) => {
             const paramName = paramNode.parameters?.name || 'param1';
-            const defaultValue = paramNode.parameters?.defaultValue || 0;
+            const defaultValue = paramNode.parameters?.defaultValue ?? 0;
+            const effectiveValue = paramOverrides[paramName] !== undefined
+                ? paramOverrides[paramName]
+                : defaultValue;
             const alias = paramNode.parameters?.alias || '';
-
             if (alias) {
-                // This param is an alias for another internal param
-                code += `    param ${paramName} = ${defaultValue}  // alias for ${alias}\n`;
+                code += `    param ${paramName} = ${effectiveValue}  // alias for ${alias}\n`;
             } else {
-                code += `    param ${paramName} = ${defaultValue}\n`;
+                code += `    param ${paramName} = ${effectiveValue}\n`;
             }
         });
 
-        // Generate input declarations
+        // Input declarations using the port name from the input node
         inputNodes.forEach((inputNode, idx) => {
-            code += `    input in_${idx}\n`;
+            const portName = (inputNode.parameters?.name || '').trim() || `in_${idx}`;
+            code += `    input ${portName}\n`;
         });
 
         // Sort connections for consistent ordering
@@ -498,11 +501,12 @@ applyEditorMixin(class {
             }
         });
 
-        // Generate output statements
+        // Output declarations using the port name from the output node
         outputNodes.forEach((outputNode, idx) => {
             const connection = graphData.connections.find(c => c.to.nodeId === outputNode.id);
+            const portName = (outputNode.parameters?.name || '').trim() || `out_${idx}`;
             if (connection) {
-                code += `    output out_${idx} ${connection.wireName}\n`;
+                code += `    output ${portName} ${connection.wireName}\n`;
             }
         });
 

@@ -304,7 +304,6 @@ applyEditorMixin(class {
     /** Create a module-instance node from a saved graph definition.
      *  Pass an explicit id when restoring a serialized state. */
     createModuleInstanceNode(graphData, position, id = null) {
-        // Analyze the graph to determine inputs, outputs, and parameters
         const inputNodes = [];
         const outputNodes = [];
         const paramNodes = [];
@@ -314,7 +313,7 @@ applyEditorMixin(class {
                 inputNodes.push(nodeData);
             } else if (nodeData.type === 'output') {
                 outputNodes.push(nodeData);
-            } else if (nodeData.type === 'const' && nodeData.parameters?.isParam) {
+            } else if (nodeData.type === 'param') {
                 paramNodes.push(nodeData);
             }
         });
@@ -332,13 +331,22 @@ applyEditorMixin(class {
             nodeId = `${moduleName}_${this.nextNodeId++}`;
         }
 
-        // Create custom node inputs/outputs based on the graph
-        const inputs = inputNodes.map((node, idx) => `in_${idx}`);
-        const outputs = outputNodes.map((node, idx) => `out_${idx}`);
+        // Use port names from the input/output nodes, falling back to in_N / out_N
+        const inputs = inputNodes.map((node, idx) =>
+            (node.parameters?.name || '').trim() || `in_${idx}`);
+        const outputs = outputNodes.map((node, idx) =>
+            (node.parameters?.name || '').trim() || `out_${idx}`);
 
-        // Create module instance node
+        // Collect param specs so the parameter panel can show editable fields
+        const paramSpecs = paramNodes.map(n => ({
+            name: n.parameters?.name || 'param',
+            defaultValue: n.parameters?.defaultValue ?? 0
+        }));
+
         const parameters = {
             modulePath: moduleName + '.mmgraph',
+            paramSpecs,
+            paramOverrides: {},
             ...graphData.executionSettings
         };
 

@@ -321,6 +321,47 @@ class NodeEditor {
                 `;
                 break;
 
+            case 'input':
+            case 'output':
+                html = `
+                    <div class="parameter-field">
+                        <label for="io-name">Port Name:</label>
+                        <input type="text" id="io-name" value="${nodeData.parameters.name || ''}" placeholder="e.g. signal_in">
+                        <div class="parameter-hint">Shown as the port label on module instances that include this graph.</div>
+                    </div>
+                `;
+                break;
+
+            case 'module_instance': {
+                // Derive specs from stored paramSpecs, or fall back to scanning moduleDefinition
+                let specs = nodeData.parameters.paramSpecs;
+                if ((!specs || specs.length === 0) && nodeData.moduleDefinition) {
+                    specs = nodeData.moduleDefinition.nodes
+                        .filter(n => n.type === 'param')
+                        .map(n => ({ name: n.parameters?.name || 'param', defaultValue: n.parameters?.defaultValue ?? 0 }));
+                }
+                specs = specs || [];
+                if (specs.length === 0) {
+                    html = '<p class="no-params-msg">This module has no parameters.</p>';
+                } else {
+                    const overrides = nodeData.parameters.paramOverrides || {};
+                    html = specs.map(spec => {
+                        const val = overrides[spec.name] !== undefined ? overrides[spec.name] : spec.defaultValue;
+                        return `
+                            <div class="parameter-field">
+                                <label for="mparam-${spec.name}">${spec.name}:</label>
+                                <input type="number" id="mparam-${spec.name}"
+                                       data-param-name="${spec.name}"
+                                       value="${val}" step="any"
+                                       placeholder="${spec.defaultValue}">
+                                <span class="parameter-hint">default: ${spec.defaultValue}</span>
+                            </div>
+                        `;
+                    }).join('');
+                }
+                break;
+            }
+
             default:
                 html = '<p>No parameters available for this node type.</p>';
         }
@@ -368,6 +409,32 @@ class NodeEditor {
                 nodeData.parameters.defaultValue = parseFloat(paramDefault) || 0;
                 nodeData.parameters.alias = paramAlias || '';
                 break;
+
+            case 'input':
+            case 'output': {
+                const ioPortName = document.getElementById('io-name').value.trim();
+                nodeData.parameters.name = ioPortName.replace(/[^a-zA-Z0-9_]/g, '_');
+                break;
+            }
+
+            case 'module_instance': {
+                let specs = nodeData.parameters.paramSpecs;
+                if ((!specs || specs.length === 0) && nodeData.moduleDefinition) {
+                    specs = nodeData.moduleDefinition.nodes
+                        .filter(n => n.type === 'param')
+                        .map(n => ({ name: n.parameters?.name || 'param', defaultValue: n.parameters?.defaultValue ?? 0 }));
+                }
+                const newOverrides = {};
+                (specs || []).forEach(spec => {
+                    const input = document.getElementById(`mparam-${spec.name}`);
+                    if (input) {
+                        const v = parseFloat(input.value);
+                        if (!isNaN(v)) newOverrides[spec.name] = v;
+                    }
+                });
+                nodeData.parameters.paramOverrides = newOverrides;
+                break;
+            }
         }
 
         // Update the parameter display on the node
