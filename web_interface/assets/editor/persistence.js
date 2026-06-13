@@ -24,7 +24,10 @@ applyEditorMixin(class {
                 parameters: parameters,
                 parameterBindings: nodeData.parameterBindings || {},
                 moduleName: nodeData.moduleName || null,
-                moduleDefinition: nodeData.moduleDefinition || null
+                moduleDefinition: nodeData.moduleDefinition || null,
+                isLibrary: nodeData.isLibrary || false,
+                libraryName: nodeData.libraryName || null,
+                moduleSource: nodeData.moduleSource || null
             });
         });
 
@@ -202,12 +205,16 @@ applyEditorMixin(class {
         // Restore nodes
         graphData.nodes.forEach(nodeData => {
             let nodeId;
-            if (nodeData.type === 'module_instance' && nodeData.moduleDefinition) {
+            if (nodeData.type === 'module_instance' && nodeData.isLibrary) {
+                nodeId = this.createLibraryNode(
+                    nodeData.libraryName, nodeData.pos, nodeData.id);
+            } else if (nodeData.type === 'module_instance' && nodeData.moduleDefinition) {
                 nodeId = this.createModuleInstanceNode(
                     nodeData.moduleDefinition, nodeData.pos, nodeData.id);
             } else {
                 nodeId = this.createNode(nodeData.type, nodeData.pos, { id: nodeData.id });
             }
+            if (nodeId === null) return; // library introspection failed; skip
 
             // Restore parameters
             const newNodeData = this.nodes.get(nodeId);

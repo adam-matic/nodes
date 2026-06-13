@@ -157,10 +157,17 @@ applyEditorMixin(class {
             return '';
         }
 
-        // Collect module definitions; first instance of each module name wins for overrides
+        // Library nodes are backed by stdlib modules; pull them in by name
+        // rather than re-emitting their bodies (see editor/library.js)
+        const libraryImports = new Set();
+        // Module-instance nodes from saved graphs carry their own definition,
+        // which we re-emit inline; first instance of each name wins for overrides
         const moduleDefinitions = new Map();
         this.nodes.forEach((nodeData) => {
-            if (nodeData.type === 'module_instance' && nodeData.moduleDefinition) {
+            if (nodeData.type !== 'module_instance') return;
+            if (nodeData.isLibrary && nodeData.libraryName) {
+                libraryImports.add(nodeData.libraryName);
+            } else if (nodeData.moduleDefinition) {
                 const moduleName = nodeData.moduleName || 'module';
                 if (!moduleDefinitions.has(moduleName)) {
                     moduleDefinitions.set(moduleName, {
@@ -171,8 +178,15 @@ applyEditorMixin(class {
             }
         });
 
-        // Generate module definitions first
         let code = '';
+
+        // Imports for library modules come first
+        Array.from(libraryImports).sort().forEach(name => {
+            code += `import ${name}\n`;
+        });
+        if (libraryImports.size > 0) code += '\n';
+
+        // Then inline definitions for graph-backed module instances
         moduleDefinitions.forEach(({ def, overrides }, moduleName) => {
             code += this.generateModuleDefinitionCode(def, moduleName, overrides);
             code += '\n\n';
@@ -243,6 +257,29 @@ applyEditorMixin(class {
 
                 const params = inputWires.join(', ');
                 code += `    ${conn.wireName} = ${fromNode.type}(${params})\n`;
+                addedWires.add(conn.wireName);
+            } else if (fromNode.type === 'module_instance' && fromNode.isLibrary) {
+                // Library node: emit a named-argument call. The VM requires
+                // named args for module instantiation, and only overridden
+                // params are passed (others use the module's own defaults).
+                const nodeInputs = this.getNodeInputs(fromNode.type, fromNode);
+                const args = [];
+
+                nodeInputs.forEach((inputName, inputIndex) => {
+                    const inputConn = this.connections.find(c =>
+                        c.to.nodeId === fromNode.id && c.to.portIndex === inputIndex
+                    );
+                    if (inputConn) {
+                        args.push(`${inputName}=${inputConn.wireName}`);
+                    }
+                });
+
+                const overrides = fromNode.parameters?.paramOverrides || {};
+                Object.keys(overrides).forEach(pName => {
+                    args.push(`${pName}=${overrides[pName]}`);
+                });
+
+                code += `    ${conn.wireName} = ${fromNode.libraryName}(${args.join(', ')})\n`;
                 addedWires.add(conn.wireName);
             } else if (fromNode.type === 'module_instance') {
                 // Find input wires to the module instance

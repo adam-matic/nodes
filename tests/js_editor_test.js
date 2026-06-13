@@ -22,6 +22,7 @@ const SOURCES = [
     'app.js',
     'editor/history.js',
     'editor/routing.js',
+    'editor/library.js',
     'editor/graph.js',
     'editor/interaction.js',
     'editor/codegen.js',

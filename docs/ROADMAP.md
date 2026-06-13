@@ -108,25 +108,25 @@ one-off dev scripts and can be fixed if/when needed.
         `generateModuleDefinitionCode` (falls back to scanning
         `moduleDefinition` for files saved before `paramSpecs` existed).
 
-- [ ] Richer node library — surface the existing stdlib modules as the
-      "library". The VM's only primitives are `add/sub/mul/div`, the
-      comparisons, `mem`, and `const`; every signal source (sine, square,
-      triangle, sawtooth, ramp, pulse), filter (low/high/band-pass),
-      integrator/differentiator, PID, and min/mux already exists as a
-      composable module in `assets/solver/stdlib.js`. So rather than add new
-      VM primitives (which would also touch the Python reference and the 36
-      golden fixtures), add a palette section that drops these library modules
-      as module-instance nodes, reusing the named-ports + param-editing work
-      above.
-      - Design fork to resolve first: a stdlib entry is module *source text*,
-        whereas a module-instance node today stores parsed graph JSON
-        (`moduleDefinition`) and regenerates the module via
-        `generateModuleDefinitionCode`. For library nodes, emit `import <name>`
-        + a call instead, and introspect ports/params by lightly scanning the
-        source's `input` / `output` / `param` declarations (the parser is
-        already ported to JS and available in-browser).
-      - "Scope" is already covered by plot nodes; "mux" exists as the `min`/
-        select pattern and can ship as a small stdlib module.
+- [x] Richer node library — surfaces the existing stdlib modules as a palette
+      "library" rather than adding new VM primitives (the VM's only primitives
+      are `add/sub/mul/div`, the comparisons, `mem`, and `const`; every signal
+      source, filter, integrator/differentiator, PID, and min already exists as
+      a composable module in `assets/solver/stdlib.js`).
+      - `assets/editor/library.js` (`NodeLibrary`, pure/unit-tested in
+        `tests/js_library_test.js`) holds a curated registry of single-output
+        building blocks and an `introspect()` that parses a module's source and
+        pulls out its input/output ports and parameter defaults via the AST.
+      - The palette generates a button per registry entry (grouped Sources /
+        Math / Filters / Control); dropping one creates a `module_instance`
+        node flagged `isLibrary`, reusing the named-port labels and
+        param-editing panel from the module-instance UX work above.
+      - Codegen emits `import <name>` at the top plus a named-argument call
+        `wire = name(inputName=wire, param=override, ...)` — named args are
+        required by the VM, and only overridden params are passed (others use
+        the module's own defaults). Verified end-to-end through the solver.
+      - "Scope" is already covered by plot nodes; an explicit "mux" can ship
+        later as a small stdlib module (the `min`/select pattern).
 
 - [ ] Optional Tauri/Electron wrapper once the page is static. Largest scope,
       adds a build/tooling layer to a project that has stayed zero-dependency;
