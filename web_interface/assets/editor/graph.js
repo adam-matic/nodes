@@ -165,6 +165,7 @@ applyEditorMixin(class {
             port.style.top = `${20 + index * 15}px`;
             port.dataset.portType = 'input';
             port.dataset.portIndex = index;
+            port.title = input;
             node.appendChild(port);
         });
 
@@ -176,6 +177,7 @@ applyEditorMixin(class {
             port.style.top = `${20 + index * 15}px`;
             port.dataset.portType = 'output';
             port.dataset.portIndex = index;
+            port.title = output;
             node.appendChild(port);
         });
 
@@ -183,7 +185,6 @@ applyEditorMixin(class {
     }
 
     getParameterDisplayText(type, parameters) {
-        // Generate parameter display text based on node type
         switch (type) {
             case 'mem':
                 return `init: ${parameters.initialValue}`;
@@ -193,8 +194,22 @@ applyEditorMixin(class {
                 return `x: ${parameters.signalX}, y: ${parameters.signalY}`;
             case 'param':
                 return `${parameters.name}: ${parameters.defaultValue}${parameters.alias ? ` → ${parameters.alias}` : ''}`;
+            case 'input':
+            case 'output':
+                return parameters.name || '';
+            case 'module_instance': {
+                const overrides = parameters.paramOverrides;
+                if (overrides && Object.keys(overrides).length > 0) {
+                    return Object.entries(overrides).map(([k, v]) => `${k}=${v}`).join(', ');
+                }
+                const specs = parameters.paramSpecs;
+                if (specs && specs.length > 0) {
+                    return `${specs.length} param${specs.length > 1 ? 's' : ''}`;
+                }
+                return '';
+            }
             default:
-                return ''; // No parameters to display
+                return '';
         }
     }
 
@@ -238,8 +253,7 @@ applyEditorMixin(class {
     }
 
     nodeHasParameters(type) {
-        // Define which node types have configurable parameters
-        return ['mem', 'const', 'plot', 'param'].includes(type);
+        return ['mem', 'const', 'plot', 'param', 'input', 'output', 'module_instance'].includes(type);
     }
 
     getDefaultParameters(type) {
@@ -260,6 +274,9 @@ applyEditorMixin(class {
                     defaultValue: 0,
                     alias: ''
                 };
+            case 'input':
+            case 'output':
+                return { name: '' };
             default:
                 return {};
         }
@@ -465,7 +482,7 @@ applyEditorMixin(class {
         let wireName;
 
         if (fromNode.type === 'input') {
-            wireName = `in_${fromNum}`;
+            wireName = fromNode.parameters?.name || `in_${fromNum}`;
         } else if (fromNode.type === 'param') {
             // Use the parameter name directly
             wireName = fromNode.parameters?.name || `param_${fromNum}`;
@@ -669,29 +686,50 @@ Current Value: ${connection.value !== null ? connection.value : 'none'}`;
         node.style.top = pos.y + 'px';
         node.dataset.nodeId = id;
 
+        // Ensure the node body is tall enough to contain all port labels
+        const portCount = Math.max(inputs.length, outputs.length);
+        if (portCount > 2) {
+            node.style.minHeight = (36 + portCount * 15) + 'px';
+        }
+
+        const paramText = this.getParameterDisplayText('module_instance', parameters);
         node.innerHTML = `
             <div class="node-title">📦 ${moduleName}</div>
-            <div class="node-params">${inputs.length} in, ${outputs.length} out</div>
+            <div class="node-params">${paramText}</div>
         `;
 
-        // Add input ports
-        inputs.forEach((input, index) => {
+        // Add input ports with name labels
+        inputs.forEach((inputName, index) => {
             const port = document.createElement('div');
             port.className = 'port input';
             port.style.top = `${20 + index * 15}px`;
             port.dataset.portType = 'input';
             port.dataset.portIndex = index;
+            port.title = inputName;
             node.appendChild(port);
+
+            const label = document.createElement('span');
+            label.className = 'port-label input-label';
+            label.style.top = `${20 + index * 15}px`;
+            label.textContent = inputName;
+            node.appendChild(label);
         });
 
-        // Add output ports
-        outputs.forEach((output, index) => {
+        // Add output ports with name labels
+        outputs.forEach((outputName, index) => {
             const port = document.createElement('div');
             port.className = 'port output';
             port.style.top = `${20 + index * 15}px`;
             port.dataset.portType = 'output';
             port.dataset.portIndex = index;
+            port.title = outputName;
             node.appendChild(port);
+
+            const label = document.createElement('span');
+            label.className = 'port-label output-label';
+            label.style.top = `${20 + index * 15}px`;
+            label.textContent = outputName;
+            node.appendChild(label);
         });
 
         return node;

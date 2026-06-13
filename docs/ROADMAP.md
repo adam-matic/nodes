@@ -93,11 +93,44 @@ one-off dev scripts and can be fixed if/when needed.
       detour around nodes sitting on the direct path. Pure geometry,
       unit-tested in `tests/js_routing_test.js`.
 
-## Phase 4 — Later
+## Phase 4 — Module instances & node library
 
-- [ ] Richer node library (signal sources, scopes, mux).
-- [ ] Better module-instance UX.
-- [ ] Optional Tauri/Electron wrapper once the page is static.
+- [x] Better module-instance UX:
+      - `input`/`output` nodes carry a configurable Port Name (edited via the
+        ⚙ action). The name becomes the wire name for connections out of an
+        input node, and is surfaced as the module instance's port labels.
+      - Module-instance nodes render port-name labels beside each port
+        (flip-aware), grow to fit >2 ports, and show param overrides (or an
+        "N params" summary) in the subtitle.
+      - The ⚙ panel on a module instance lists the module's `param` nodes as
+        editable number fields; overrides are stored in
+        `parameters.paramOverrides` and applied in
+        `generateModuleDefinitionCode` (falls back to scanning
+        `moduleDefinition` for files saved before `paramSpecs` existed).
+
+- [ ] Richer node library — surface the existing stdlib modules as the
+      "library". The VM's only primitives are `add/sub/mul/div`, the
+      comparisons, `mem`, and `const`; every signal source (sine, square,
+      triangle, sawtooth, ramp, pulse), filter (low/high/band-pass),
+      integrator/differentiator, PID, and min/mux already exists as a
+      composable module in `assets/solver/stdlib.js`. So rather than add new
+      VM primitives (which would also touch the Python reference and the 36
+      golden fixtures), add a palette section that drops these library modules
+      as module-instance nodes, reusing the named-ports + param-editing work
+      above.
+      - Design fork to resolve first: a stdlib entry is module *source text*,
+        whereas a module-instance node today stores parsed graph JSON
+        (`moduleDefinition`) and regenerates the module via
+        `generateModuleDefinitionCode`. For library nodes, emit `import <name>`
+        + a call instead, and introspect ports/params by lightly scanning the
+        source's `input` / `output` / `param` declarations (the parser is
+        already ported to JS and available in-browser).
+      - "Scope" is already covered by plot nodes; "mux" exists as the `min`/
+        select pattern and can ship as a small stdlib module.
+
+- [ ] Optional Tauri/Electron wrapper once the page is static. Largest scope,
+      adds a build/tooling layer to a project that has stayed zero-dependency;
+      defer until the in-browser editor feels complete.
 
 Touch support stays as-is (isolated in its own handlers) but receives no
 further investment.

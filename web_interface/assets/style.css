@@ -617,6 +617,44 @@ body {
     background: #FFCDD2;
 }
 
+/* Port name labels on module-instance nodes */
+.port-label {
+    position: absolute;
+    font-size: 9px;
+    color: #555;
+    pointer-events: none;
+    white-space: nowrap;
+    line-height: 12px;
+}
+
+.port-label.input-label {
+    left: 10px;
+}
+
+.port-label.output-label {
+    right: 10px;
+    text-align: right;
+}
+
+/* On flipped nodes the whole element is scaleX(-1); unflip just the text */
+.node.flipped .port-label {
+    transform: scaleX(-1);
+}
+
+/* Small hint text under parameter inputs */
+.parameter-hint {
+    display: block;
+    font-size: 11px;
+    color: #888;
+    margin-top: 2px;
+}
+
+.no-params-msg {
+    color: #888;
+    font-size: 13px;
+    margin: 8px 0;
+}
+
 .node-title {
     font-weight: bold;
     text-align: center;
