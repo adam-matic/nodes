@@ -1,0 +1,32 @@
+// A module with two outputs, demonstrating multi-output module instances.
+// Each output is consumed separately by the calling graph via dot access
+// (s.sum / s.product), which the VM resolves to the instance's flattened
+// "<instance>.<output>" signals.
+
+module splitter {
+    input x
+
+    sum = add(x, 1)
+    product = mul(x, 2)
+
+    output sum
+    output product
+}
+
+module multi_output_example {
+    src = const(value=5)
+
+    // Instantiate once; read each output independently.
+    s = splitter(x=src)
+
+    sum_plus = add(s.sum, 100)
+    prod_plus = add(s.product, 1000)
+
+    output sum_plus
+    output prod_plus
+}
+
+execution {
+    max_steps: 3
+    save: [sum_plus, prod_plus]
+}

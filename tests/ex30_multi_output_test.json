@@ -1,0 +1,11 @@
+{
+  "test_name": "Test multi-output module instance",
+  "module_file": "examples/advanced/ex30_multi_output.txt",
+  "module_name": "multi_output_example",
+  "parameters": {},
+  "max_steps": 3,
+  "expected_output": {
+    "sum_plus": [106, 106, 106],
+    "prod_plus": [1010, 1010, 1010]
+  }
+}

@@ -133,9 +133,19 @@ one-off dev scripts and can be fixed if/when needed.
       - "Scope" is already covered by plot nodes; an explicit "mux" can ship
         later as a small stdlib module (the `min`/select pattern).
 
-- [ ] Optional Tauri/Electron wrapper once the page is static. Largest scope,
-      adds a build/tooling layer to a project that has stayed zero-dependency;
-      defer until the in-browser editor feels complete.
+- [x] Multi-output module instances. Reading one output of a multi-output
+      instance needs dot access (`instance.output`) as an *operand*, which
+      both the Python reference VM and the JS port previously rejected
+      ("Unsupported expression type: DotAccess"). Added matching support to
+      both (a `copy` from the flattened `<instance>.<output>` signal), kept in
+      parity and covered by a new golden fixture
+      (`examples/advanced/ex30_multi_output.txt` +
+      `tests/ex30_multi_output_test.json`, run by both
+      `tests/test_runner.py` and `tests/js_solver_test.js`). The editor gives
+      each output port of a multi-output instance its own wire name and emits
+      `inst = mod(args)` once, then `wire = inst.<outputDecl>` per used output
+      (keeping `output <wire>` valid); single-output instances and library
+      nodes keep the simpler VM auto-copy path.
 
 Touch support stays as-is (isolated in its own handlers) but receives no
 further investment.

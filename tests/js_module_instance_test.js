@@ -132,6 +132,46 @@ execution { max_steps: 1 }`); } catch (e) { threw = true; }
     check('positional module call is rejected by the parser', threw);
 }
 
+// --- multi-output: getModuleInstanceOutputDeclNames maps ports to the
+//     internal wires feeding each output node, in port order ---
+check('getModuleInstanceOutputDeclNames is defined',
+    typeof captured.getModuleInstanceOutputDeclNames === 'function');
+{
+    const multiNode = {
+        isLibrary: false,
+        outputs: ['result', 'extra'],
+        moduleDefinition: {
+            nodes: [
+                { id: 'in_1', type: 'input', parameters: { name: 'x' } },
+                { id: 'a_2', type: 'add', parameters: {} },
+                { id: 'm_3', type: 'mul', parameters: {} },
+                { id: 'o_4', type: 'output', parameters: { name: 'result' } },
+                { id: 'o_5', type: 'output', parameters: { name: 'extra' } },
+            ],
+            connections: [
+                { wireName: 'a_2_result', from: { nodeId: 'a_2', portIndex: 0 }, to: { nodeId: 'o_4', portIndex: 0 } },
+                { wireName: 'm_3_result', from: { nodeId: 'm_3', portIndex: 0 }, to: { nodeId: 'o_5', portIndex: 0 } },
+            ],
+        },
+    };
+    const decl = captured.getModuleInstanceOutputDeclNames.call({}, multiNode);
+    check('multi-output decl names map in port order',
+        JSON.stringify(decl) === JSON.stringify(['a_2_result', 'm_3_result']), JSON.stringify(decl));
+
+    // An unconnected output node keeps its slot as null so indices stay aligned
+    const withGap = JSON.parse(JSON.stringify(multiNode));
+    withGap.moduleDefinition.connections.pop(); // drop the wire into o_5
+    const decl2 = captured.getModuleInstanceOutputDeclNames.call({}, withGap);
+    check('unconnected output keeps an aligned null slot',
+        JSON.stringify(decl2) === JSON.stringify(['a_2_result', null]), JSON.stringify(decl2));
+}
+{
+    const lib = { isLibrary: true, outputs: ['output_val'] };
+    const decl = captured.getModuleInstanceOutputDeclNames.call({}, lib);
+    check('library output decl names equal its outputs',
+        JSON.stringify(decl) === JSON.stringify(['output_val']));
+}
+
 console.log(`\n=== Test Summary ===`);
 console.log(`Passed: ${passed}/${passed + failed}`);
 if (failed > 0) {

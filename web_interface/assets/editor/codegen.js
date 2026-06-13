@@ -194,6 +194,9 @@ applyEditorMixin(class {
 
         code += 'module visual_graph {\n';
         const addedWires = new Set();
+        // Multi-output module instances are instantiated once, then read
+        // per-output; this tracks which have had their instantiation emitted.
+        const instantiatedNodes = new Set();
 
         // Sort connections for consistent ordering
         const sortedConnections = [...this.connections].sort((a, b) => a.wireName.localeCompare(b.wireName));
@@ -298,7 +301,26 @@ applyEditorMixin(class {
                 });
 
                 const moduleName = fromNode.moduleName || 'module';
-                code += `    ${conn.wireName} = ${moduleName}(${args.join(', ')})\n`;
+                const declNames = this.getModuleInstanceOutputDeclNames(fromNode);
+
+                if (declNames.length > 1) {
+                    // Multi-output: instantiate once, then copy each used output
+                    // out of the instance via dot access. A single-token copy
+                    // target keeps the wire usable as an `output`/operand.
+                    const counter = fromNode.id.split('_').pop();
+                    const instVar = `${moduleName}_${counter}_inst`;
+                    if (!instantiatedNodes.has(fromNode.id)) {
+                        code += `    ${instVar} = ${moduleName}(${args.join(', ')})\n`;
+                        instantiatedNodes.add(fromNode.id);
+                    }
+                    const declName = declNames[conn.from.portIndex];
+                    if (declName) {
+                        code += `    ${conn.wireName} = ${instVar}.${declName}\n`;
+                    }
+                } else {
+                    // Single output: the VM copies it to the assignment target
+                    code += `    ${conn.wireName} = ${moduleName}(${args.join(', ')})\n`;
+                }
                 addedWires.add(conn.wireName);
             }
         });
@@ -336,6 +358,27 @@ applyEditorMixin(class {
         code += '}';
 
         return code;
+    }
+
+    /**
+     * Output declaration names for a module-instance node, indexed by output
+     * port. For a saved-graph module these are the internal wires feeding each
+     * output node (the names emitted as `output <wire>` in the module body),
+     * which is what a multi-output instance reads via `instance.<name>`.
+     * Returns nulls for ports with no incoming wire so indices stay aligned.
+     */
+    getModuleInstanceOutputDeclNames(nodeData) {
+        if (nodeData.isLibrary) {
+            return nodeData.outputs || []; // library modules are single-output
+        }
+        const def = nodeData.moduleDefinition;
+        if (!def) return nodeData.outputs || [];
+        return def.nodes
+            .filter(n => n.type === 'output')
+            .map(outNode => {
+                const conn = def.connections.find(c => c.to.nodeId === outNode.id);
+                return conn ? conn.wireName : null;
+            });
     }
 
     getParameterBinding(nodeData, paramKey) {

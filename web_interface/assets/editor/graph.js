@@ -356,8 +356,9 @@ applyEditorMixin(class {
             [from, to] = [to, from];
         }
 
-        // Generate unique wire name
-        const wireName = this.generateWireName(from.nodeId, to.nodeId);
+        // Generate unique wire name (output port index distinguishes the
+        // wires of multi-output module instances)
+        const wireName = this.generateWireName(from.nodeId, to.nodeId, from.portIndex);
 
         const connection = {
             id: `conn_${this.connections.length}`,
@@ -533,7 +534,7 @@ applyEditorMixin(class {
         const reach = Math.max(40, Math.abs(x2 - x1) / 2);
         return `M ${x1} ${y1} C ${x1 + dir * reach} ${y1}, ${(x1 + x2) / 2} ${y2}, ${x2} ${y2}`;
     }
-    generateWireName(fromNodeId, toNodeId) {
+    generateWireName(fromNodeId, toNodeId, fromPortIndex = 0) {
         // Generate wire name based ONLY on source node and port
         // This ensures multiple connections from the same output share the same wire name
         const fromNode = this.nodes.get(fromNodeId);
@@ -568,7 +569,11 @@ applyEditorMixin(class {
             const base = fromNode.isLibrary
                 ? fromNode.libraryName
                 : (fromNode.moduleName || 'module');
-            wireName = `${base}_${counter}_out`;
+            // Multi-output instances need a distinct wire per output port
+            const multiOutput = (fromNode.outputs || []).length > 1;
+            wireName = multiOutput
+                ? `${base}_${counter}_o${fromPortIndex}`
+                : `${base}_${counter}_out`;
         } else {
             wireName = `${fromNode.type}_${fromNum}_out`;
         }
