@@ -23,16 +23,21 @@ applyEditorMixin(class {
             // Right-click - show context menu
             if (e.button === 2) {
                 e.preventDefault();
-                this.selectNode(node);
+                if (!this.selectedNodes.has(node.dataset.nodeId)) {
+                    this.selectNode(node);
+                }
                 this.showNodeContextMenu(e, node);
                 return;
             }
 
-            this.selectNode(node);
-            this.startDrag(e);
+            this.selectNode(node, e.shiftKey);
+            if (!e.shiftKey) {
+                this.startDrag(e);
+            }
         } else {
-            // Clicked on empty space - clear selection
-            this.clearSelection();
+            // Clicked on empty space: start marquee selection
+            if (!e.shiftKey) this.clearSelection();
+            this.startMarquee(e);
         }
     }
 
@@ -43,6 +48,8 @@ applyEditorMixin(class {
             this.updateDrag(e);
         } else if (this.isConnecting) {
             this.updateTempConnection(e);
+        } else if (this.isMarqueeSelecting) {
+            this.updateMarquee(e);
         }
     }
 
@@ -54,6 +61,8 @@ applyEditorMixin(class {
             this.finishConnection(e);
         } else if (this.isDragging) {
             this.finishDrag(e);
+        } else if (this.isMarqueeSelecting) {
+            this.finishMarquee(e);
         }
     }
 
@@ -171,7 +180,12 @@ applyEditorMixin(class {
         const node = target.closest('.node');
         if (!node) return;
 
-        this.checkpoint(); // pre-move positions (deduped if nothing moves)
+        const nodeId = node.dataset.nodeId;
+        if (!this.selectedNodes.has(nodeId)) {
+            this.selectNode(node);
+        }
+
+        this.checkpoint();
         this.isDragging = true;
         this.selectedNode = node;
 
@@ -181,27 +195,38 @@ applyEditorMixin(class {
             y: touch.clientY - rect.top
         };
 
-        node.classList.add('dragging');
+        const nodeData = this.nodes.get(nodeId);
+        this.dragStartPos = nodeData ? { x: nodeData.pos.x, y: nodeData.pos.y } : null;
+        this.dragStartPositions = new Map();
+        for (const selId of this.selectedNodes) {
+            const selData = this.nodes.get(selId);
+            if (selData) {
+                this.dragStartPositions.set(selId, { x: selData.pos.x, y: selData.pos.y });
+                selData.element.classList.add('dragging');
+            }
+        }
     }
 
     updateDragTouch(touch) {
-        if (!this.selectedNode) return;
+        if (!this.selectedNode || !this.dragStartPos || !this.dragStartPositions) return;
 
         const nodeEditor = this.canvasEl;
         const editorRect = nodeEditor.getBoundingClientRect();
 
-        // Convert screen coordinates to world coordinates
         const screenX = touch.clientX - editorRect.left - this.dragOffset.x;
         const screenY = touch.clientY - editorRect.top - this.dragOffset.y;
         const worldPos = this.screenToWorld(screenX, screenY);
 
-        this.selectedNode.style.left = worldPos.x + 'px';
-        this.selectedNode.style.top = worldPos.y + 'px';
+        const dx = worldPos.x - this.dragStartPos.x;
+        const dy = worldPos.y - this.dragStartPos.y;
 
-        // Update node position in data
-        const nodeId = this.selectedNode.dataset.nodeId;
-        if (this.nodes.has(nodeId)) {
-            this.nodes.get(nodeId).pos = worldPos;
+        for (const [selId, startPos] of this.dragStartPositions) {
+            const selData = this.nodes.get(selId);
+            if (!selData) continue;
+            const newPos = { x: startPos.x + dx, y: startPos.y + dy };
+            selData.element.style.left = newPos.x + 'px';
+            selData.element.style.top = newPos.y + 'px';
+            selData.pos = newPos;
         }
 
         this.updateConnections();
@@ -209,10 +234,15 @@ applyEditorMixin(class {
 
     finishDragTouch() {
         if (this.selectedNode) {
-            this.selectedNode.classList.remove('dragging');
+            for (const selId of this.selectedNodes) {
+                const selData = this.nodes.get(selId);
+                if (selData) selData.element.classList.remove('dragging');
+            }
             this.selectedNode = null;
         }
         this.isDragging = false;
+        this.dragStartPos = null;
+        this.dragStartPositions = null;
     }
 
     startConnectionTouch(touch, port) {
@@ -343,7 +373,13 @@ applyEditorMixin(class {
         const node = e.target.closest('.node');
         if (!node) return;
 
-        this.checkpoint(); // pre-move positions (deduped if nothing moves)
+        const nodeId = node.dataset.nodeId;
+        // If dragging a node not in the current selection, switch selection to it
+        if (!this.selectedNodes.has(nodeId)) {
+            this.selectNode(node);
+        }
+
+        this.checkpoint();
         this.isDragging = true;
         this.selectedNode = node;
 
@@ -353,27 +389,41 @@ applyEditorMixin(class {
             y: e.clientY - rect.top
         };
 
-        node.classList.add('dragging');
+        // Record world start positions for all selected nodes (for multi-drag)
+        const nodeData = this.nodes.get(nodeId);
+        this.dragStartPos = nodeData ? { x: nodeData.pos.x, y: nodeData.pos.y } : null;
+        this.dragStartPositions = new Map();
+        for (const selId of this.selectedNodes) {
+            const selData = this.nodes.get(selId);
+            if (selData) {
+                this.dragStartPositions.set(selId, { x: selData.pos.x, y: selData.pos.y });
+                selData.element.classList.add('dragging');
+            }
+        }
     }
 
     updateDrag(e) {
-        if (!this.selectedNode) return;
+        if (!this.selectedNode || !this.dragStartPos || !this.dragStartPositions) return;
 
         const nodeEditor = this.canvasEl;
         const editorRect = nodeEditor.getBoundingClientRect();
 
-        // Convert screen coordinates to world coordinates
         const screenX = e.clientX - editorRect.left - this.dragOffset.x;
         const screenY = e.clientY - editorRect.top - this.dragOffset.y;
         const worldPos = this.screenToWorld(screenX, screenY);
 
-        this.selectedNode.style.left = worldPos.x + 'px';
-        this.selectedNode.style.top = worldPos.y + 'px';
+        // Delta from primary node's starting world position
+        const dx = worldPos.x - this.dragStartPos.x;
+        const dy = worldPos.y - this.dragStartPos.y;
 
-        // Update node position in data
-        const nodeId = this.selectedNode.dataset.nodeId;
-        if (this.nodes.has(nodeId)) {
-            this.nodes.get(nodeId).pos = worldPos;
+        // Move all selected nodes by the same delta
+        for (const [selId, startPos] of this.dragStartPositions) {
+            const selData = this.nodes.get(selId);
+            if (!selData) continue;
+            const newPos = { x: startPos.x + dx, y: startPos.y + dy };
+            selData.element.style.left = newPos.x + 'px';
+            selData.element.style.top = newPos.y + 'px';
+            selData.pos = newPos;
         }
 
         this.updateConnections();
@@ -381,10 +431,15 @@ applyEditorMixin(class {
 
     finishDrag(e) {
         if (this.selectedNode) {
-            this.selectedNode.classList.remove('dragging');
+            for (const selId of this.selectedNodes) {
+                const selData = this.nodes.get(selId);
+                if (selData) selData.element.classList.remove('dragging');
+            }
             this.selectedNode = null;
         }
         this.isDragging = false;
+        this.dragStartPos = null;
+        this.dragStartPositions = null;
     }
 
     startConnection(e) {
@@ -693,5 +748,130 @@ applyEditorMixin(class {
     hideNodeContextMenu() {
         const menu = document.getElementById('node-context-menu');
         menu.classList.add('hidden');
+    }
+
+    // ── Marquee (rubber-band) selection ───────────────────────────────────
+
+    startMarquee(e) {
+        const rect = this.canvasEl.getBoundingClientRect();
+        const sx = e.clientX - rect.left;
+        const sy = e.clientY - rect.top;
+
+        this.isMarqueeSelecting = true;
+        this.marqueeStartScreen = { x: sx, y: sy };
+
+        this.marqueeEl = document.createElement('div');
+        this.marqueeEl.className = 'marquee-rect';
+        this.marqueeEl.style.left = sx + 'px';
+        this.marqueeEl.style.top  = sy + 'px';
+        this.marqueeEl.style.width  = '0px';
+        this.marqueeEl.style.height = '0px';
+        this.canvasEl.appendChild(this.marqueeEl);
+    }
+
+    updateMarquee(e) {
+        if (!this.isMarqueeSelecting || !this.marqueeEl) return;
+
+        const rect = this.canvasEl.getBoundingClientRect();
+        const sx = e.clientX - rect.left;
+        const sy = e.clientY - rect.top;
+
+        const x1 = Math.min(sx, this.marqueeStartScreen.x);
+        const y1 = Math.min(sy, this.marqueeStartScreen.y);
+        const x2 = Math.max(sx, this.marqueeStartScreen.x);
+        const y2 = Math.max(sy, this.marqueeStartScreen.y);
+
+        this.marqueeEl.style.left   = x1 + 'px';
+        this.marqueeEl.style.top    = y1 + 'px';
+        this.marqueeEl.style.width  = (x2 - x1) + 'px';
+        this.marqueeEl.style.height = (y2 - y1) + 'px';
+
+        // Live-update which nodes are inside the rect
+        const w1 = this.screenToWorld(x1, y1);
+        const w2 = this.screenToWorld(x2, y2);
+
+        for (const [id, data] of this.nodes) {
+            const nx = data.pos.x;
+            const ny = data.pos.y;
+            const nw = data.element.offsetWidth  || 120;
+            const nh = data.element.offsetHeight || 60;
+            const inside = nx < w2.x && nx + nw > w1.x && ny < w2.y && ny + nh > w1.y;
+
+            if (inside) {
+                if (!this.selectedNodes.has(id)) {
+                    this.selectedNodes.add(id);
+                    data.element.classList.add('selected');
+                }
+            } else {
+                if (this.selectedNodes.has(id)) {
+                    this.selectedNodes.delete(id);
+                    data.element.classList.remove('selected');
+                }
+            }
+        }
+        this.updateToolbarButtonStates();
+    }
+
+    finishMarquee(e) {
+        if (!this.isMarqueeSelecting) return;
+
+        if (this.marqueeEl) {
+            this.marqueeEl.remove();
+            this.marqueeEl = null;
+        }
+        this.isMarqueeSelecting = false;
+        this.marqueeStartScreen = null;
+
+        // Set selectedNodeForHighlight to one of the selected nodes (or null)
+        if (this.selectedNodes.size === 1) {
+            const id = Array.from(this.selectedNodes)[0];
+            this.selectedNodeForHighlight = this.nodes.get(id)?.element || null;
+        } else {
+            this.selectedNodeForHighlight = null;
+        }
+
+        if (this.selectedNodes.size === 1) {
+            this.showNodeActions(this.selectedNodeForHighlight);
+        } else {
+            this.hideNodeActions();
+        }
+        this.updateToolbarButtonStates();
+    }
+
+    // ── Zoom to fit ──────────────────────────────────────────────────────
+
+    zoomToFit() {
+        if (this.nodes.size === 0) return;
+
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const [, data] of this.nodes) {
+            const x = data.pos.x;
+            const y = data.pos.y;
+            const w = data.element.offsetWidth  || 120;
+            const h = data.element.offsetHeight || 60;
+            if (x       < minX) minX = x;
+            if (y       < minY) minY = y;
+            if (x + w   > maxX) maxX = x + w;
+            if (y + h   > maxY) maxY = y + h;
+        }
+
+        const PAD = 60;
+        const contentW = maxX - minX;
+        const contentH = maxY - minY;
+        const canvasRect = this.canvasEl.getBoundingClientRect();
+        const cW = canvasRect.width;
+        const cH = canvasRect.height;
+
+        const zoom = Math.min(
+            (cW - 2 * PAD) / (contentW || 1),
+            (cH - 2 * PAD) / (contentH || 1),
+            2
+        );
+        this.zoom = Math.max(0.1, zoom);
+        this.panX = (cW - contentW * this.zoom) / 2 - minX * this.zoom;
+        this.panY = (cH - contentH * this.zoom) / 2 - minY * this.zoom;
+
+        this.updateViewportTransform();
+        this.updateConnections();
     }
 });

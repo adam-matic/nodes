@@ -295,6 +295,24 @@ body {
 .palette-item.plot { border-color: #00BCD4; background: #E0F7FA; }
 .palette-item.library { border-color: #673AB7; background: #EDE7F6; }
 
+.palette-search {
+    display: block;
+    width: 100%;
+    padding: 5px 8px;
+    margin-bottom: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 12px;
+    background: white;
+    box-sizing: border-box;
+}
+
+.palette-search:focus {
+    outline: none;
+    border-color: #2196F3;
+    box-shadow: 0 0 0 2px rgba(33,150,243,0.15);
+}
+
 .palette-hint {
     font-size: 11px;
     color: #999;
@@ -326,6 +344,15 @@ body {
 .node-editor.space-pan,
 .node-editor.space-pan * {
     cursor: grab !important;
+}
+
+/* Rubber-band marquee selection rectangle */
+.marquee-rect {
+    position: absolute;
+    background: rgba(33, 150, 243, 0.08);
+    border: 1.5px dashed #2196F3;
+    pointer-events: none;
+    z-index: 50;
 }
 
 .viewport {
@@ -1190,4 +1217,132 @@ body {
     color: #999;
     font-size: 13px;
     pointer-events: none;
+}
+
+/* ── CodeMirror dark theme ─────────────────────────────────────────── */
+
+.code-editor-cm {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+#code-tab .code-editor-cm .CodeMirror {
+    height: 100%;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+/* modmath-dark theme */
+.cm-s-modmath-dark.CodeMirror {
+    background: #1e1e1e;
+    color: #d4d4d4;
+}
+.cm-s-modmath-dark .CodeMirror-gutters {
+    background: #252526;
+    border-right: 1px solid #333;
+    color: #858585;
+}
+.cm-s-modmath-dark .CodeMirror-cursor { border-left-color: #aeafad; }
+.cm-s-modmath-dark .CodeMirror-selected { background: #264f78; }
+.cm-s-modmath-dark .cm-keyword   { color: #569cd6; }
+.cm-s-modmath-dark .cm-builtin   { color: #4ec9b0; }
+.cm-s-modmath-dark .cm-variable  { color: #9cdcfe; }
+.cm-s-modmath-dark .cm-variable-2 { color: #dcdcaa; }
+.cm-s-modmath-dark .cm-number    { color: #b5cea8; }
+.cm-s-modmath-dark .cm-comment   { color: #6a9955; font-style: italic; }
+.cm-s-modmath-dark .cm-operator  { color: #d4d4d4; }
+.cm-s-modmath-dark .cm-punctuation { color: #d4d4d4; }
+.cm-s-modmath-dark .CodeMirror-activeline-background { background: #2a2d2e; }
+.cm-s-modmath-dark .CodeMirror-matchingbracket { outline: 1px solid #888; color: #d4d4d4 !important; }
+
+/* ── Keyboard shortcuts overlay ────────────────────────────────────── */
+
+.shortcuts-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 3000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.shortcuts-dialog {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    min-width: 520px;
+    max-width: 92vw;
+    max-height: 85vh;
+    overflow: auto;
+}
+
+.shortcuts-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 20px;
+    border-bottom: 1px solid #eee;
+    background: #f9f9f9;
+    border-radius: 8px 8px 0 0;
+}
+
+.shortcuts-header h3 {
+    margin: 0;
+    font-size: 16px;
+    color: #333;
+}
+
+.shortcuts-body {
+    display: flex;
+    gap: 24px;
+    padding: 16px 20px 20px;
+}
+
+.shortcuts-col {
+    flex: 1;
+    min-width: 200px;
+}
+
+.shortcuts-group-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #888;
+    margin: 14px 0 6px;
+}
+
+.shortcuts-col:first-child .shortcuts-group-title:first-child {
+    margin-top: 0;
+}
+
+.shortcut-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 5px;
+    font-size: 13px;
+    color: #333;
+    min-height: 24px;
+}
+
+.shortcut-row span {
+    color: #555;
+    margin-left: auto;
+    text-align: right;
+}
+
+.shortcut-row kbd {
+    background: #f0f0f0;
+    border: 1px solid #bbb;
+    border-bottom-width: 2px;
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 11px;
+    font-family: inherit;
+    color: #333;
+    white-space: nowrap;
 }

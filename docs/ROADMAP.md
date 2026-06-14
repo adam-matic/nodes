@@ -199,3 +199,63 @@ gallery is actually wanted.
 - [ ] **Sharing & community.** Public publish, a browse/gallery page, fork
       from gallery, permalinks — a straightforward extension once the accounts
       DB exists.
+
+## Phase 6 — UI/UX improvements
+
+Prioritised list derived from a full audit of the editor in June 2026.
+High-impact items that change daily workflow first, polish last.
+
+### High impact (top 5 — in progress)
+
+- [x] **Multi-node selection.** Rubber-band marquee (drag on empty canvas) and
+      Shift-click toggle. All selected nodes move together when dragged; Del
+      deletes all of them; Ctrl+A selects all. The action bar (params/flip/dup)
+      only appears for single-node selections; the toolbar Delete button enables
+      whenever ≥1 node is selected.
+- [x] **Copy / paste.** Ctrl+C copies all selected nodes plus the connections
+      between them into an in-memory clipboard; Ctrl+V pastes at +40 px offset
+      with the new nodes pre-selected. Wire names are not preserved on paste
+      (acceptable — they get auto-assigned by codegen). Cross-graph paste works
+      because the clipboard is just a plain object.
+- [x] **Zoom to fit (`F` key + toolbar button).** Computes the bounding box of
+      all nodes and sets pan/zoom to centre them with 60 px padding. Caps at
+      2× zoom so a single-node graph doesn't fill the screen. Also accessible
+      as a toolbar button next to Run/Step/Reset.
+- [x] **Palette search.** A filter `<input>` at the top of the node palette
+      hides sections and items that don't match the query (text of the button or
+      `data-type` / `data-library` attribute). Sections with no visible items
+      are hidden entirely. Clearing the search restores all items.
+- [x] **Real code editor (CodeMirror 5).** Replaces the plain dark textarea
+      with a CodeMirror instance with a custom `modmath` syntax mode (keywords,
+      built-ins, `$step`, comments, numbers), line numbers, and proper tab
+      indentation. Loaded from CDN; degrades gracefully to a fallback textarea
+      if the CDN is unavailable.
+
+### Medium impact (next)
+
+- [ ] **Empty-canvas onboarding hint.** Show a centered "Drag a node here to
+      start" placeholder when the viewport has no nodes. Add an **Examples**
+      drop-down in the toolbar that loads one of the bundled examples — critical
+      for discoverability since the project is educational.
+- [ ] **Grid + optional snap.** Background dot-grid on the canvas and a
+      snap-to-grid toggle (default off). Keeps graphs tidy without manual
+      alignment. Grid spacing 20 px world units.
+- [ ] **Keyboard shortcut help overlay.** Press `?` to open an overlay listing
+      all shortcuts (Esc, Ctrl+S/R/Z/Y, Ctrl+A/C/V, Del, Space-pan, F, scroll
+      zoom, Ctrl+D duplicate). Currently these are invisible unless you hover
+      toolbar buttons.
+
+### Low / polish
+
+- [ ] **Consistent dark theme.** Canvas and toolbar are light; code editor and
+      output panel are dark. Offer a whole-app dark mode toggle (CSS custom
+      properties, `prefers-color-scheme` default).
+- [ ] **Toolbar overflow collapse.** On narrow screens the toolbar wraps
+      (`flex-wrap`). Collapse the file ops group (New/Save/Load/Module/Projects)
+      into a single "File ▾" menu button below ~900 px.
+- [ ] **Node tooltips.** On hover, show a one-line description of what each
+      node type does. Especially useful for the library/stdlib nodes where the
+      name alone isn't self-explanatory (e.g. `pid`, `biquad`, `ewma`).
+- [ ] **Wire value tooltip on hover.** Instead of rendering the value as SVG
+      text on every wire, show it in a tooltip on connection hover to reduce
+      visual clutter on dense graphs.

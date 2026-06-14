@@ -61,6 +61,29 @@ applyEditorMixin(class {
                 this.createNode(type, pos);
             }
         });
+
+        // Palette search: filter items and section headings by query
+        const searchInput = document.getElementById('palette-search');
+        if (searchInput) {
+            searchInput.addEventListener('input', () => {
+                const q = searchInput.value.trim().toLowerCase();
+                palette.querySelectorAll('.palette-section').forEach(section => {
+                    const items = section.querySelectorAll('.palette-item');
+                    let anyVisible = false;
+                    items.forEach(item => {
+                        const text = (
+                            item.textContent + ' ' +
+                            (item.dataset.library || '') + ' ' +
+                            (item.dataset.type || '')
+                        ).toLowerCase();
+                        const visible = !q || text.includes(q);
+                        item.style.display = visible ? '' : 'none';
+                        if (visible) anyVisible = true;
+                    });
+                    section.style.display = anyVisible ? '' : 'none';
+                });
+            });
+        }
     }
 
     /** Populate #library-sections with one button per NodeLibrary entry,

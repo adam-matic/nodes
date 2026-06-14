@@ -823,8 +823,35 @@ Current Value: ${connection.value !== null ? connection.value : 'none'}`;
             return;
         }
 
-        if (this.selectedNodeForHighlight) {
-            this.deleteSelectedNode();
+        if (!this.selectedNodes || this.selectedNodes.size === 0) return;
+
+        this.checkpoint();
+        const idsToDelete = Array.from(this.selectedNodes);
+        this.clearSelection();
+
+        for (const nodeId of idsToDelete) {
+            const nodeData = this.nodes.get(nodeId);
+            if (!nodeData) continue;
+
+            if (nodeData.type === 'param') {
+                this.removeParameterBindings(nodeId);
+            }
+
+            this.connections = this.connections.filter(c => {
+                if (c.from.nodeId === nodeId || c.to.nodeId === nodeId) {
+                    if (c.element) c.element.remove();
+                    return false;
+                }
+                return true;
+            });
+
+            nodeData.element.remove();
+            this.nodes.delete(nodeId);
         }
+
+        this.syncPlotPanel();
+        this.hideNodeActions();
+        this.updateToolbarButtonStates();
+        this.scheduleAutoCompile();
     }
 });
