@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Modular Math Language - Visual Editor</title>
     <link rel="stylesheet" href="assets/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
     <script src="assets/solver/tokenizer.js"></script>
     <script src="assets/solver/parser.js"></script>
     <script src="assets/solver/vm.js"></script>
@@ -40,9 +42,14 @@
                     <button id="toolbar-run-btn" class="btn btn-primary" title="Run / stop (Ctrl+R)"><span class="btn-icon">▶</span>Run</button>
                     <button id="toolbar-step-btn" class="btn" title="Execute one step"><span class="btn-icon">⏵</span>Step</button>
                     <button id="toolbar-reset-btn" class="btn" title="Reset execution"><span class="btn-icon">↻</span>Reset</button>
+                    <button id="fit-view-btn" class="btn" title="Zoom to fit all nodes (F)"><span class="btn-icon">⊞</span>Fit</button>
                     <span id="toolbar-step-counter" class="step-counter">Step: 0</span>
                 </div>
                 <div class="toolbar-spacer"></div>
+                <div class="toolbar-group">
+                    <button id="help-btn" class="btn" title="Keyboard shortcuts (?)">?</button>
+                </div>
+                <div class="toolbar-separator"></div>
                 <div class="toolbar-group">
                     <label class="auto-compile-toggle" title="Recompile automatically when the graph changes">
                         <input type="checkbox" id="auto-compile-checkbox" checked>
@@ -67,6 +74,7 @@
                 <!-- Visual Editor: node palette + canvas -->
                 <div id="visual-tab" class="visual-editor-layout">
                     <aside id="node-palette" class="node-palette">
+                        <input type="search" id="palette-search" class="palette-search" placeholder="Filter nodes…" autocomplete="off">
                         <div class="palette-section">
                             <div class="palette-heading">Arithmetic</div>
                             <button class="palette-item arithmetic" draggable="true" data-type="add">add</button>
@@ -115,7 +123,9 @@
 
                 <!-- Code Editor -->
                 <div id="code-tab" class="hidden">
-                    <textarea id="code-editor" class="code-editor">module counter {
+                    <div id="code-editor-container" class="code-editor-cm"></div>
+                    <!-- Fallback textarea shown only when CodeMirror CDN is unavailable -->
+                    <textarea id="code-editor-fallback" class="code-editor" style="display:none">module counter {
     // The counter's next value is its previous value plus one.
     next_value = add(current_value, 1)
 
@@ -190,6 +200,43 @@ execution {
         <div class="parameter-footer">
             <button id="save-params-btn" class="btn btn-primary">Save</button>
             <button id="cancel-params-btn" class="btn btn-secondary">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Keyboard shortcuts overlay -->
+    <div id="shortcuts-overlay" class="shortcuts-overlay hidden" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
+        <div class="shortcuts-dialog">
+            <div class="shortcuts-header">
+                <h3>Keyboard Shortcuts</h3>
+                <button id="close-shortcuts-btn" class="close-btn" title="Close (Esc)">×</button>
+            </div>
+            <div class="shortcuts-body">
+                <div class="shortcuts-col">
+                    <div class="shortcuts-group-title">File</div>
+                    <div class="shortcut-row"><kbd>Ctrl</kbd>+<kbd>S</kbd><span>Save graph</span></div>
+                    <div class="shortcut-row"><kbd>Ctrl</kbd>+<kbd>Z</kbd><span>Undo</span></div>
+                    <div class="shortcut-row"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd><span>Redo</span></div>
+                    <div class="shortcuts-group-title">Selection</div>
+                    <div class="shortcut-row"><kbd>Click</kbd><span>Select node</span></div>
+                    <div class="shortcut-row"><kbd>Shift</kbd>+<kbd>Click</kbd><span>Toggle add to selection</span></div>
+                    <div class="shortcut-row"><kbd>Drag</kbd> on canvas<span>Marquee select</span></div>
+                    <div class="shortcut-row"><kbd>Ctrl</kbd>+<kbd>A</kbd><span>Select all nodes</span></div>
+                    <div class="shortcut-row"><kbd>Esc</kbd><span>Clear selection</span></div>
+                </div>
+                <div class="shortcuts-col">
+                    <div class="shortcuts-group-title">Edit</div>
+                    <div class="shortcut-row"><kbd>Ctrl</kbd>+<kbd>C</kbd><span>Copy selection</span></div>
+                    <div class="shortcut-row"><kbd>Ctrl</kbd>+<kbd>V</kbd><span>Paste</span></div>
+                    <div class="shortcut-row"><kbd>Del</kbd> / <kbd>Backspace</kbd><span>Delete selection</span></div>
+                    <div class="shortcuts-group-title">View</div>
+                    <div class="shortcut-row"><kbd>F</kbd><span>Zoom to fit</span></div>
+                    <div class="shortcut-row"><kbd>Space</kbd>+<kbd>Drag</kbd><span>Pan canvas</span></div>
+                    <div class="shortcut-row"><kbd>Scroll</kbd><span>Zoom</span></div>
+                    <div class="shortcuts-group-title">Run</div>
+                    <div class="shortcut-row"><kbd>Ctrl</kbd>+<kbd>R</kbd><span>Run / stop</span></div>
+                    <div class="shortcut-row"><kbd>?</kbd><span>This help</span></div>
+                </div>
+            </div>
         </div>
     </div>
 

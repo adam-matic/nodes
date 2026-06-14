@@ -426,10 +426,8 @@ applyEditorMixin(class {
         const generatedCode = this.generateCodeFromGraph();
 
         // Update the code editor with generated code
-        const codeEditor = document.getElementById('code-editor');
-        if (codeEditor && generatedCode.trim()) {
-            codeEditor.value = generatedCode;
-            console.log('Generated code:', generatedCode); // Debug logging
+        if (generatedCode.trim()) {
+            this.setCodeEditorValue(generatedCode);
         }
 
         // Auto-compile if valid
@@ -492,9 +490,8 @@ applyEditorMixin(class {
 
         // Generate and update code
         const generatedCode = this.generateCodeFromGraph();
-        const codeEditor = document.getElementById('code-editor');
-        if (codeEditor && generatedCode.trim()) {
-            codeEditor.value = generatedCode;
+        if (generatedCode.trim()) {
+            this.setCodeEditorValue(generatedCode);
         }
 
         // Show status in output tab

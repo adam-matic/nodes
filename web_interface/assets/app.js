@@ -41,8 +41,20 @@ class NodeEditor {
         this.longPressTimer = null;
         this.longPressNode = null;
 
+        // Multi-select state
+        this.selectedNodes = new Set();   // Set of selected node IDs
+        this.clipboard = null;            // { nodes: [...], connections: [...] }
+        this.dragStartPos = null;         // world pos of primary drag node at start
+        this.dragStartPositions = null;   // Map<nodeId, {x,y}> for multi-drag
+        this.isMarqueeSelecting = false;
+        this.marqueeStartScreen = null;
+        this.marqueeEl = null;
+
         // Floating action bar shown above the selected node
         this.nodeActionsEl = null;
+
+        // CodeMirror instance (null until initCodeMirror runs)
+        this.codeMirror = null;
 
         // The canvas area of the visual tab (the palette sidebar sits beside it)
         this.canvasEl = document.getElementById('editor-canvas');
@@ -70,6 +82,7 @@ class NodeEditor {
         this.setupPalette();
         this.setupProjects();
         this.createSampleNodes();
+        this.initCodeMirror();
 
         // API integration
         this.apiClient = window.apiClient;
@@ -107,6 +120,12 @@ class NodeEditor {
         document.getElementById('params-node-btn').addEventListener('click', () => this.showParameterPanel());
         document.getElementById('flip-node-btn').addEventListener('click', () => this.flipSelectedNode());
         document.getElementById('delete-btn').addEventListener('click', () => this.deleteSelected());
+        document.getElementById('fit-view-btn').addEventListener('click', () => this.zoomToFit());
+        document.getElementById('help-btn').addEventListener('click', () => this.toggleShortcuts());
+        document.getElementById('close-shortcuts-btn').addEventListener('click', () => this.toggleShortcuts());
+        document.getElementById('shortcuts-overlay').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) this.toggleShortcuts();
+        });
         document.getElementById('new-graph-btn').addEventListener('click', () => this.newGraph());
         document.getElementById('save-graph-btn').addEventListener('click', () => this.saveGraph());
         document.getElementById('load-graph-btn').addEventListener('click', () => this.loadGraph());
@@ -171,18 +190,48 @@ class NodeEditor {
         }
     }
 
-    selectNode(nodeElement) {
-        // Clear previous selection
-        if (this.selectedNodeForHighlight) {
-            this.selectedNodeForHighlight.classList.remove('selected');
+    selectNode(nodeElement, addToSelection = false) {
+        if (addToSelection && nodeElement) {
+            const nodeId = nodeElement.dataset.nodeId;
+            if (this.selectedNodes.has(nodeId)) {
+                // Deselect this node
+                this.selectedNodes.delete(nodeId);
+                nodeElement.classList.remove('selected');
+                if (this.selectedNodeForHighlight === nodeElement) {
+                    const ids = Array.from(this.selectedNodes);
+                    this.selectedNodeForHighlight = ids.length > 0
+                        ? (this.nodes.get(ids[ids.length - 1])?.element || null)
+                        : null;
+                }
+            } else {
+                this.selectedNodes.add(nodeId);
+                nodeElement.classList.add('selected');
+                this.selectedNodeForHighlight = nodeElement;
+            }
+        } else {
+            // Single select: clear all previous, select just this one
+            for (const id of this.selectedNodes) {
+                const data = this.nodes.get(id);
+                if (data) data.element.classList.remove('selected');
+            }
+            this.selectedNodes.clear();
+            if (this.selectedConnection) {
+                this.selectedConnection.pathElement.classList.remove('selected');
+                if (this.selectedConnection.touchArea) this.selectedConnection.touchArea.classList.remove('selected');
+                this.selectedConnection = null;
+            }
+            if (nodeElement) {
+                this.selectedNodes.add(nodeElement.dataset.nodeId);
+                nodeElement.classList.add('selected');
+            }
+            this.selectedNodeForHighlight = nodeElement;
         }
-
-        // Select new node
-        this.selectedNodeForHighlight = nodeElement;
-        if (nodeElement) {
-            nodeElement.classList.add('selected');
+        // Show action bar only for single selection
+        if (this.selectedNodes.size === 1) {
+            this.showNodeActions(nodeElement || this.selectedNodeForHighlight);
+        } else {
+            this.hideNodeActions();
         }
-        this.showNodeActions(nodeElement);
         this.updateToolbarButtonStates();
     }
 
@@ -191,6 +240,7 @@ class NodeEditor {
     showNodeActions(nodeElement) {
         this.hideNodeActions();
         if (!nodeElement) return;
+        if (this.selectedNodes && this.selectedNodes.size > 1) return;
 
         const nodeData = this.nodes.get(nodeElement.dataset.nodeId);
 
@@ -203,7 +253,7 @@ class NodeEditor {
         }
         actions.push({ icon: '⇄', title: 'Flip horizontally', handler: () => this.flipSelectedNode() });
         actions.push({ icon: '⧉', title: 'Duplicate', handler: () => this.duplicateSelectedNode() });
-        actions.push({ icon: '🗑', title: 'Delete (Del)', handler: () => this.deleteSelectedNode(), danger: true });
+        actions.push({ icon: '🗑', title: 'Delete (Del)', handler: () => this.deleteSelected(), danger: true });
 
         actions.forEach(({ icon, title, handler, danger }) => {
             const btn = document.createElement('button');
@@ -235,6 +285,13 @@ class NodeEditor {
     }
 
     clearSelection() {
+        if (this.selectedNodes) {
+            for (const id of this.selectedNodes) {
+                const data = this.nodes.get(id);
+                if (data) data.element.classList.remove('selected');
+            }
+            this.selectedNodes.clear();
+        }
         if (this.selectedNodeForHighlight) {
             this.selectedNodeForHighlight.classList.remove('selected');
             this.selectedNodeForHighlight = null;
@@ -493,8 +550,7 @@ class NodeEditor {
         }, 100);
     }
     async compileCode() {
-        const codeEditor = document.getElementById('code-editor');
-        const code = codeEditor.value;
+        const code = this.getCodeEditorValue();
 
         // Reset variable table flag for new compilation
         this.variableTableInitialized = false;
@@ -879,15 +935,18 @@ class NodeEditor {
 
     updateToolbarButtonStates() {
         const nodeElement = this.selectedNodeForHighlight;
+        const multiSelected = this.selectedNodes && this.selectedNodes.size > 1;
+        const anyNodeSelected = this.selectedNodes && this.selectedNodes.size > 0;
+
         let hasParameters = false;
-        if (nodeElement) {
+        if (nodeElement && !multiSelected) {
             const nodeData = this.nodes.get(nodeElement.dataset.nodeId);
             hasParameters = !!(nodeData && this.nodeHasParameters(nodeData.type));
         }
 
-        document.getElementById('params-node-btn').disabled = !hasParameters;
-        document.getElementById('flip-node-btn').disabled = !nodeElement;
-        document.getElementById('delete-btn').disabled = !nodeElement && !this.selectedConnection;
+        document.getElementById('params-node-btn').disabled = !hasParameters || multiSelected;
+        document.getElementById('flip-node-btn').disabled = !nodeElement || multiSelected;
+        document.getElementById('delete-btn').disabled = !anyNodeSelected && !this.selectedConnection;
     }
 
     onKeyDown(e) {
@@ -918,6 +977,22 @@ class NodeEditor {
 
         if (isTyping) return;
 
+        if (mod && (e.key === 'a' || e.key === 'A')) {
+            e.preventDefault();
+            this.selectAll();
+            return;
+        }
+        if (mod && (e.key === 'c' || e.key === 'C')) {
+            e.preventDefault();
+            this.copySelected();
+            return;
+        }
+        if (mod && (e.key === 'v' || e.key === 'V')) {
+            e.preventDefault();
+            this.pasteClipboard();
+            return;
+        }
+
         if (mod && (e.key === 'z' || e.key === 'Z')) {
             e.preventDefault();
             if (e.shiftKey) {
@@ -947,6 +1022,21 @@ class NodeEditor {
         if (e.key === 'Delete' || e.key === 'Backspace') {
             e.preventDefault();
             this.deleteSelected();
+            return;
+        }
+
+        // F - zoom to fit all nodes
+        if (e.key === 'f' || e.key === 'F') {
+            e.preventDefault();
+            this.zoomToFit();
+            return;
+        }
+
+        // ? - keyboard shortcuts help
+        if (e.key === '?') {
+            e.preventDefault();
+            this.toggleShortcuts();
+            return;
         }
     }
 
@@ -959,6 +1049,203 @@ class NodeEditor {
                 this.finishPan();
             }
         }
+    }
+
+    // ── Multi-select helpers ─────────────────────────────────────────────
+
+    selectAll() {
+        this.clearSelection();
+        for (const [id, data] of this.nodes) {
+            this.selectedNodes.add(id);
+            data.element.classList.add('selected');
+            this.selectedNodeForHighlight = data.element;
+        }
+        this.hideNodeActions();
+        this.updateToolbarButtonStates();
+    }
+
+    copySelected() {
+        if (!this.selectedNodes || this.selectedNodes.size === 0) return;
+
+        const ids = Array.from(this.selectedNodes);
+        const idSet = new Set(ids);
+
+        const nodesCopy = ids.map(id => {
+            const data = this.nodes.get(id);
+            if (!data) return null;
+            return {
+                id,
+                type: data.type,
+                pos: { x: data.pos.x, y: data.pos.y },
+                parameters: JSON.parse(JSON.stringify(data.parameters || {})),
+                isFlipped: !!data.isFlipped,
+                isLibrary: data.isLibrary || false,
+                libraryName: data.libraryName || null,
+                moduleDefinition: data.moduleDefinition
+                    ? JSON.parse(JSON.stringify(data.moduleDefinition)) : null,
+            };
+        }).filter(Boolean);
+
+        const connsCopy = this.connections
+            .filter(c => idSet.has(c.from.nodeId) && idSet.has(c.to.nodeId))
+            .map(c => ({
+                from: { nodeId: c.from.nodeId, portType: c.from.portType, portIndex: c.from.portIndex },
+                to:   { nodeId: c.to.nodeId,   portType: c.to.portType,   portIndex: c.to.portIndex   },
+            }));
+
+        this.clipboard = { nodes: nodesCopy, connections: connsCopy };
+    }
+
+    pasteClipboard() {
+        if (!this.clipboard || this.clipboard.nodes.length === 0) return;
+
+        const OFFSET = 40;
+        const idMap = new Map();
+
+        this.clearSelection();
+
+        for (const nd of this.clipboard.nodes) {
+            const pos = { x: nd.pos.x + OFFSET, y: nd.pos.y + OFFSET };
+            let newId;
+
+            if (nd.isLibrary && nd.libraryName) {
+                newId = this.createLibraryNode(nd.libraryName, pos);
+                const copy = this.nodes.get(newId);
+                if (copy) {
+                    copy.parameters.paramOverrides =
+                        JSON.parse(JSON.stringify(nd.parameters.paramOverrides || {}));
+                    copy.isFlipped = nd.isFlipped;
+                    if (copy.isFlipped) copy.element.classList.add('flipped');
+                    this.updateNodeParameterDisplay(newId);
+                }
+            } else if (nd.moduleDefinition) {
+                newId = this.createModuleInstanceNode(nd.moduleDefinition, pos);
+            } else {
+                newId = this.createNode(nd.type, pos);
+                const copy = this.nodes.get(newId);
+                if (copy) {
+                    copy.parameters = JSON.parse(JSON.stringify(nd.parameters || {}));
+                    copy.isFlipped = nd.isFlipped;
+                    if (copy.isFlipped) copy.element.classList.add('flipped');
+                    this.updateNodeParameterDisplay(newId);
+                    if (copy.type === 'plot') this.syncPlotPanel();
+                }
+            }
+
+            idMap.set(nd.id, newId);
+            const newData = this.nodes.get(newId);
+            if (newData) {
+                this.selectedNodes.add(newId);
+                newData.element.classList.add('selected');
+                this.selectedNodeForHighlight = newData.element;
+            }
+        }
+
+        for (const conn of this.clipboard.connections) {
+            const fromId = idMap.get(conn.from.nodeId);
+            const toId   = idMap.get(conn.to.nodeId);
+            if (!fromId || !toId) continue;
+            const fromData = this.nodes.get(fromId);
+            const toData   = this.nodes.get(toId);
+            if (!fromData || !toData) continue;
+
+            const fromEl = fromData.element.querySelector(
+                `.port[data-port-type="${conn.from.portType}"][data-port-index="${conn.from.portIndex}"]`);
+            const toEl   = toData.element.querySelector(
+                `.port[data-port-type="${conn.to.portType}"][data-port-index="${conn.to.portIndex}"]`);
+
+            if (fromEl && toEl) {
+                this.createConnection(
+                    { nodeId: fromId, portType: conn.from.portType, portIndex: conn.from.portIndex, element: fromEl },
+                    { nodeId: toId,   portType: conn.to.portType,   portIndex: conn.to.portIndex,   element: toEl   }
+                );
+            }
+        }
+
+        this.hideNodeActions();
+        this.updateToolbarButtonStates();
+        this.scheduleAutoCompile();
+    }
+
+    // ── CodeMirror helpers ───────────────────────────────────────────────
+
+    initCodeMirror() {
+        if (typeof CodeMirror === 'undefined') {
+            const ta = document.getElementById('code-editor-fallback');
+            if (ta) ta.style.display = '';
+            return;
+        }
+
+        CodeMirror.defineMode('modmath', function() {
+            const keywords = /^(module|execution|output|input|import|mem|save|max_steps)\b/;
+            const builtins = /^(add|sub|mul|div|gt|lt|eq|gte|lte|const|plot|param|HALT)\b/;
+            return {
+                token(stream) {
+                    if (stream.match(/\/\/.*$/)) return 'comment';
+                    if (stream.match(/\$\w+/)) return 'variable-2';
+                    if (stream.match(keywords)) return 'keyword';
+                    if (stream.match(builtins)) return 'builtin';
+                    if (stream.match(/[0-9]+(\.[0-9]+)?/)) return 'number';
+                    if (stream.match(/[a-zA-Z_]\w*/)) return 'variable';
+                    stream.next();
+                    return null;
+                }
+            };
+        });
+
+        const defaultCode = `module counter {
+    // The counter's next value is its previous value plus one.
+    next_value = add(current_value, 1)
+
+    // The \`mem\` block provides the one-step delay needed for the feedback loop.
+    // It starts at 0.
+    current_value = mem(0, next_value)
+
+    output current_value
+}
+
+execution {
+    max_steps: 10
+    save: [current_value]
+}`;
+
+        const container = document.getElementById('code-editor-container');
+        if (!container) return;
+
+        this.codeMirror = CodeMirror(container, {
+            value: defaultCode,
+            mode: 'modmath',
+            theme: 'modmath-dark',
+            lineNumbers: true,
+            indentWithTabs: false,
+            tabSize: 4,
+            indentUnit: 4,
+            extraKeys: {
+                Tab: cm => cm.replaceSelection('    '),
+            },
+        });
+    }
+
+    getCodeEditorValue() {
+        if (this.codeMirror) return this.codeMirror.getValue();
+        const ta = document.getElementById('code-editor-fallback');
+        return ta ? ta.value : '';
+    }
+
+    setCodeEditorValue(text) {
+        if (this.codeMirror) {
+            this.codeMirror.setValue(text);
+        } else {
+            const ta = document.getElementById('code-editor-fallback');
+            if (ta) ta.value = text;
+        }
+    }
+
+    // ── Shortcuts overlay ────────────────────────────────────────────────
+
+    toggleShortcuts() {
+        const overlay = document.getElementById('shortcuts-overlay');
+        overlay.classList.toggle('hidden');
     }
 }
 
