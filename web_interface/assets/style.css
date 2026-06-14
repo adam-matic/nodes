@@ -578,7 +578,7 @@ body {
 .node.comparison { border-color: #9C27B0; background: #F3E5F5; }
 .node.io { border-color: #F44336; background: #FFEBEE; }
 .node.parameter { border-color: #FF5722; background: #FFEBE9; }
-.node.plot { border-color: #00BCD4; background: #E0F7FA; }
+.node.plot { border-color: #00BCD4; background: #E0F7FA; min-width: 260px; }
 
 .node.module-instance {
     border-color: #673AB7;
@@ -1217,6 +1217,42 @@ body {
     color: #999;
     font-size: 13px;
     pointer-events: none;
+}
+
+/* ── Inline chart embedded inside plot nodes ────────────────────────── */
+
+.node-inline-chart {
+    margin-top: 6px;
+    height: 150px;
+    border-radius: 4px;
+    overflow: hidden;
+    background: white;
+    cursor: default;
+    user-select: none;
+}
+
+/* PlotView renders a .plot-card with header+body; hide the header in nodes */
+.node-inline-chart .plot-card {
+    border: none;
+    box-shadow: none;
+    background: transparent;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.node-inline-chart .plot-card-header {
+    display: none;
+}
+
+.node-inline-chart .plot-card-body {
+    flex: 1;
+    height: 100%;
+    min-height: 0;
+}
+
+.node-inline-chart .plot-card-body canvas {
+    cursor: crosshair;
 }
 
 /* ── CodeMirror dark theme ─────────────────────────────────────────── */
