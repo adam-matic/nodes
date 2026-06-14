@@ -12,8 +12,9 @@ applyEditorMixin(class {
 
         // Check for unconnected input ports
         this.nodes.forEach(nodeData => {
-            if (nodeData.type === 'output' || nodeData.type === 'const' || nodeData.type === 'input') {
-                return; // These don't need inputs
+            if (nodeData.type === 'output' || nodeData.type === 'const' ||
+                nodeData.type === 'input' || nodeData.type === 'plot') {
+                return; // These don't require all inputs to be connected
             }
 
             const nodeInputs = this.getNodeInputs(nodeData.type, nodeData);
@@ -342,17 +343,17 @@ applyEditorMixin(class {
         const maxSteps = maxStepsInput ? parseInt(maxStepsInput.value) || 10 : 10;
         code += `    max_steps: ${maxSteps}\n`;
 
-        // Add save variables for outputs (use wire names)
-        const outputWires = [];
+        // Add save variables for outputs and plot-connected signals
+        const savedWires = new Set();
         this.connections.forEach(conn => {
             const toNode = this.nodes.get(conn.to.nodeId);
-            if (toNode && toNode.type === 'output') {
-                outputWires.push(conn.wireName);
+            if (toNode && (toNode.type === 'output' || toNode.type === 'plot')) {
+                savedWires.add(conn.wireName);
             }
         });
 
-        if (outputWires.length > 0) {
-            code += `    save: [${outputWires.join(', ')}]\n`;
+        if (savedWires.size > 0) {
+            code += `    save: [${Array.from(savedWires).join(', ')}]\n`;
         }
 
         code += '}';

@@ -134,7 +134,7 @@ applyEditorMixin(class {
             type: type,
             element: node,
             pos: pos,
-            inputs: this.getNodeInputs(type),
+            inputs: this.getNodeInputs(type, { parameters }),
             outputs: this.getNodeOutputs(type),
             value: null,
             isFlipped: false,
@@ -225,7 +225,7 @@ applyEditorMixin(class {
         `;
 
         // Add input ports
-        const inputs = this.getNodeInputs(type);
+        const inputs = this.getNodeInputs(type, { parameters });
         inputs.forEach((input, index) => {
             const port = document.createElement('div');
             port.className = 'port input';
@@ -257,8 +257,11 @@ applyEditorMixin(class {
                 return `init: ${parameters.initialValue}`;
             case 'const':
                 return `value: ${parameters.value}`;
-            case 'plot':
-                return `x: ${parameters.signalX}, y: ${parameters.signalY}`;
+            case 'plot': {
+                const portCount = parameters.portCount || 1;
+                const yLabel = parameters.signalY || `${portCount} port${portCount > 1 ? 's' : ''}`;
+                return `x: ${parameters.signalX}, y: ${yLabel}`;
+            }
             case 'param':
                 return `${parameters.name}: ${parameters.defaultValue}${parameters.alias ? ` → ${parameters.alias}` : ''}`;
             case 'input':
@@ -306,7 +309,10 @@ applyEditorMixin(class {
         if (['add', 'sub', 'mul', 'div', 'gt', 'lt', 'eq'].includes(type)) return ['a', 'b'];
         if (type === 'mem') return ['signal'];
         if (type === 'output') return ['value'];
-        if (type === 'plot') return []; // Plot nodes don't need signal inputs, only params
+        if (type === 'plot') {
+            const count = nodeData?.parameters?.portCount || 1;
+            return Array.from({ length: count }, (_, i) => 'y' + (i + 1));
+        }
         if (type === 'param') return []; // Param nodes don't have inputs
         if (type === 'module_instance' && nodeData) return nodeData.inputs || [];
         return [];
@@ -333,7 +339,8 @@ applyEditorMixin(class {
                 return {
                     signalX: 'step',
                     signalY: '',
-                    historySize: 1000
+                    historySize: 1000,
+                    portCount: 1
                 };
             case 'param':
                 return {
@@ -458,6 +465,10 @@ applyEditorMixin(class {
         document.getElementById('connections').appendChild(group);
 
         this.updateConnection(connection);
+
+        // Sync plot panel when a connection goes into a plot node
+        const toNodeData = this.nodes.get(to.nodeId);
+        if (toNodeData && toNodeData.type === 'plot') this.syncPlotPanel();
 
         // Trigger validation and auto-compilation
         this.scheduleAutoCompile();
@@ -604,6 +615,11 @@ applyEditorMixin(class {
     deleteConnection(connection) {
         this.checkpoint();
 
+        const wasPlotInput = (() => {
+            const toNode = this.nodes.get(connection.to.nodeId);
+            return toNode && toNode.type === 'plot';
+        })();
+
         // Remove from connections array
         const index = this.connections.indexOf(connection);
         if (index > -1) {
@@ -614,6 +630,8 @@ applyEditorMixin(class {
         if (connection.element && connection.element.parentNode) {
             connection.element.parentNode.removeChild(connection.element);
         }
+
+        if (wasPlotInput) this.syncPlotPanel();
 
         // Trigger validation and auto-compilation
         this.scheduleAutoCompile();
@@ -759,6 +777,47 @@ Current Value: ${connection.value !== null ? connection.value : 'none'}`;
             nodeElement.appendChild(badge);
         }
     }
+    rebuildNodePorts(nodeData, newPortCount) {
+        newPortCount = Math.max(1, Math.min(8, newPortCount));
+
+        // Remove connections to ports that will no longer exist
+        const removedConns = this.connections.filter(c =>
+            c.to.nodeId === nodeData.id && c.to.portIndex >= newPortCount
+        );
+        removedConns.forEach(c => {
+            const idx = this.connections.indexOf(c);
+            if (idx > -1) this.connections.splice(idx, 1);
+            if (c.element && c.element.parentNode) c.element.parentNode.removeChild(c.element);
+        });
+
+        // Remove existing input port DOM elements
+        nodeData.element.querySelectorAll('.port.input').forEach(p => p.remove());
+
+        // Update state
+        nodeData.parameters.portCount = newPortCount;
+        nodeData.inputs = Array.from({ length: newPortCount }, (_, i) => 'y' + (i + 1));
+
+        // Add new port elements
+        nodeData.inputs.forEach((input, index) => {
+            const port = document.createElement('div');
+            port.className = 'port input';
+            port.style.top = `${20 + index * 15}px`;
+            port.dataset.portType = 'input';
+            port.dataset.portIndex = index;
+            port.title = input;
+            nodeData.element.appendChild(port);
+        });
+
+        // Re-render remaining connections into this node
+        this.connections
+            .filter(c => c.to.nodeId === nodeData.id)
+            .forEach(c => this.updateConnection(c));
+
+        this.updateNodeParameterDisplay(nodeData.id);
+        this.syncPlotPanel();
+        this.scheduleAutoCompile();
+    }
+
     createModuleInstanceElement(moduleName, id, pos, parameters, inputs, outputs) {
         const node = document.createElement('div');
         node.className = 'node module-instance';

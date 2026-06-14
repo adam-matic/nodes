@@ -236,6 +236,21 @@ applyEditorMixin(class {
                 if (newNodeData.isFlipped) {
                     newNodeData.element.classList.add('flipped');
                 }
+                // Rebuild input ports for plot nodes with non-default port count
+                if (newNodeData.type === 'plot' && (newNodeData.parameters.portCount || 1) > 1) {
+                    const count = newNodeData.parameters.portCount;
+                    newNodeData.element.querySelectorAll('.port.input').forEach(p => p.remove());
+                    newNodeData.inputs = Array.from({ length: count }, (_, i) => 'y' + (i + 1));
+                    newNodeData.inputs.forEach((input, index) => {
+                        const port = document.createElement('div');
+                        port.className = 'port input';
+                        port.style.top = `${20 + index * 15}px`;
+                        port.dataset.portType = 'input';
+                        port.dataset.portIndex = index;
+                        port.title = input;
+                        newNodeData.element.appendChild(port);
+                    });
+                }
                 this.updateNodeParameterDisplay(nodeId);
 
                 // Restore parameter binding badges

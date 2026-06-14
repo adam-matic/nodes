@@ -7,6 +7,15 @@
  */
 applyEditorMixin(class {
     getPlotYSignals(nodeData) {
+        // Primary: derive Y signals from wire connections into input ports
+        const portCount = nodeData.parameters.portCount || 1;
+        const connected = [];
+        for (let i = 0; i < portCount; i++) {
+            const conn = this.connections.find(c => c.to.nodeId === nodeData.id && c.to.portIndex === i);
+            if (conn) connected.push(conn.wireName);
+        }
+        if (connected.length > 0) return connected;
+        // Fallback: legacy manual text entry (backward compat / port-less graphs)
         return (nodeData.parameters.signalY || '')
             .split(',')
             .map(s => s.trim())

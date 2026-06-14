@@ -1219,6 +1219,114 @@ body {
     pointer-events: none;
 }
 
+/* ── Inline chart embedded inside plot nodes ────────────────────────── */
+
+.node-inline-chart {
+    margin-top: 6px;
+    height: 150px;
+    border-radius: 4px;
+    overflow: hidden;
+    background: white;
+    cursor: default;
+    user-select: none;
+}
+
+/* PlotView renders a .plot-card with header+body; hide the header in nodes */
+.node-inline-chart .plot-card {
+    border: none;
+    box-shadow: none;
+    background: transparent;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.node-inline-chart .plot-card-header {
+    display: none;
+}
+
+.node-inline-chart .plot-card-body {
+    flex: 1;
+    height: 100%;
+    min-height: 0;
+}
+
+.node-inline-chart .plot-card-body canvas {
+    cursor: crosshair;
+}
+
+/* ── Plot port parameter form ───────────────────────────────────────── */
+
+.plot-ports-list {
+    margin-bottom: 6px;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    background: #fafafa;
+    padding: 4px 6px;
+    font-size: 12px;
+}
+
+.plot-port-row {
+    display: flex;
+    align-items: center;
+    padding: 2px 0;
+    gap: 6px;
+}
+
+.plot-port-label {
+    font-weight: bold;
+    color: #00838f;
+    min-width: 24px;
+    font-size: 11px;
+    font-family: monospace;
+}
+
+.plot-port-wire {
+    color: #1565c0;
+    font-family: monospace;
+    font-size: 11px;
+    background: #e3f2fd;
+    padding: 1px 5px;
+    border-radius: 3px;
+}
+
+.plot-port-empty {
+    color: #9e9e9e;
+    font-style: italic;
+    font-size: 11px;
+}
+
+.plot-port-controls {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.plot-port-controls button {
+    flex: 1;
+    padding: 3px 8px;
+    font-size: 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: #f5f5f5;
+    cursor: pointer;
+}
+
+.plot-port-controls button:hover:not(:disabled) {
+    background: #e0e0e0;
+}
+
+.plot-port-controls button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.plot-port-hint {
+    font-size: 11px;
+    color: #9e9e9e;
+    font-style: italic;
+}
+
 /* ── CodeMirror dark theme ─────────────────────────────────────────── */
 
 .code-editor-cm {

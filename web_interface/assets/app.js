@@ -324,6 +324,20 @@ class NodeEditor {
         const content = this.generateParameterForm(nodeData);
         document.getElementById('parameter-content').innerHTML = content;
 
+        // Wire up plot port add/remove buttons
+        if (nodeData.type === 'plot') {
+            const addBtn = document.getElementById('plot-port-add');
+            const removeBtn = document.getElementById('plot-port-remove');
+            if (addBtn) addBtn.addEventListener('click', () => {
+                this.addPlotPort(nodeData.id);
+                this.showParameterPanel(); // refresh form
+            });
+            if (removeBtn) removeBtn.addEventListener('click', () => {
+                this.removePlotPort(nodeData.id);
+                this.showParameterPanel(); // refresh form
+            });
+        }
+
         // Show the panel
         document.getElementById('parameter-panel').classList.remove('hidden');
     }
@@ -354,15 +368,26 @@ class NodeEditor {
                 `;
                 break;
 
-            case 'plot':
+            case 'plot': {
+                const portCount = nodeData.parameters.portCount || 1;
+                const portRows = Array.from({ length: portCount }, (_, i) => {
+                    const conn = this.connections.find(c => c.to.nodeId === nodeData.id && c.to.portIndex === i);
+                    const wireName = conn ? `<span class="plot-port-wire">${conn.wireName}</span>` : '<span class="plot-port-empty">not connected</span>';
+                    return `<div class="plot-port-row"><span class="plot-port-label">y${i + 1}</span>${wireName}</div>`;
+                }).join('');
                 html = `
+                    <div class="parameter-field">
+                        <label>Y Signal Ports:</label>
+                        <div class="plot-ports-list">${portRows}</div>
+                        <div class="plot-port-controls">
+                            <button type="button" id="plot-port-add" title="Add port">+ Add port</button>
+                            <button type="button" id="plot-port-remove" title="Remove last port" ${portCount <= 1 ? 'disabled' : ''}>− Remove port</button>
+                        </div>
+                        <div class="plot-port-hint">Wire signals into the y ports on the left side of the node.</div>
+                    </div>
                     <div class="parameter-field">
                         <label for="signal-x">X Signal (default: step):</label>
                         <input type="text" id="signal-x" value="${nodeData.parameters.signalX}" placeholder="step">
-                    </div>
-                    <div class="parameter-field">
-                        <label for="signal-y">Y Signals (comma-separated):</label>
-                        <input type="text" id="signal-y" value="${nodeData.parameters.signalY}" placeholder="signal_a, signal_b">
                     </div>
                     <div class="parameter-field">
                         <label for="history-size">History Size (points kept):</label>
@@ -370,6 +395,7 @@ class NodeEditor {
                     </div>
                 `;
                 break;
+            }
 
             case 'param':
                 html = `
@@ -458,15 +484,14 @@ class NodeEditor {
                 nodeData.parameters.value = parseFloat(constValue) || 0;
                 break;
 
-            case 'plot':
+            case 'plot': {
                 const signalX = document.getElementById('signal-x').value;
-                const signalY = document.getElementById('signal-y').value;
                 const historySize = document.getElementById('history-size').value;
                 nodeData.parameters.signalX = signalX || 'step';
-                nodeData.parameters.signalY = signalY || '';
                 nodeData.parameters.historySize = parseInt(historySize) || 1000;
                 this.syncPlotPanel();
                 break;
+            }
 
             case 'param':
                 const paramName = document.getElementById('param-name').value;
@@ -1246,6 +1271,22 @@ execution {
     toggleShortcuts() {
         const overlay = document.getElementById('shortcuts-overlay');
         overlay.classList.toggle('hidden');
+    }
+
+    addPlotPort(nodeId) {
+        const nodeData = this.nodes.get(nodeId);
+        if (!nodeData || nodeData.type !== 'plot') return;
+        this.checkpoint();
+        this.rebuildNodePorts(nodeData, (nodeData.parameters.portCount || 1) + 1);
+    }
+
+    removePlotPort(nodeId) {
+        const nodeData = this.nodes.get(nodeId);
+        if (!nodeData || nodeData.type !== 'plot') return;
+        const current = nodeData.parameters.portCount || 1;
+        if (current <= 1) return;
+        this.checkpoint();
+        this.rebuildNodePorts(nodeData, current - 1);
     }
 }
 
