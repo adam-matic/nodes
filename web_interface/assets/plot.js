@@ -17,7 +17,8 @@ const PLOT_COLORS = [
     '#9C27B0', '#00BCD4', '#795548', '#607D8B'
 ];
 
-const PLOT_MARGIN = { top: 14, right: 14, bottom: 28, left: 58 };
+const PLOT_MARGIN      = { top: 14, right: 14, bottom: 28, left: 58 };
+const PLOT_MARGIN_COMPACT = { top: 6, right: 6, bottom: 20, left: 42 };
 
 class PlotView {
     constructor(parent, config) {
@@ -153,11 +154,12 @@ class PlotView {
     }
 
     plotRect() {
+        const m = this.config.compact ? PLOT_MARGIN_COMPACT : PLOT_MARGIN;
         return {
-            x: PLOT_MARGIN.left,
-            y: PLOT_MARGIN.top,
-            w: this.body.clientWidth - PLOT_MARGIN.left - PLOT_MARGIN.right,
-            h: this.body.clientHeight - PLOT_MARGIN.top - PLOT_MARGIN.bottom
+            x: m.left,
+            y: m.top,
+            w: this.body.clientWidth  - m.left - m.right,
+            h: this.body.clientHeight - m.top  - m.bottom
         };
     }
 

@@ -578,7 +578,7 @@ body {
 .node.comparison { border-color: #9C27B0; background: #F3E5F5; }
 .node.io { border-color: #F44336; background: #FFEBEE; }
 .node.parameter { border-color: #FF5722; background: #FFEBE9; }
-.node.plot { border-color: #00BCD4; background: #E0F7FA; }
+.node.plot { border-color: #00BCD4; background: #E0F7FA; min-width: 260px; }
 
 .node.module-instance {
     border-color: #673AB7;

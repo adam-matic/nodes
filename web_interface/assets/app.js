@@ -757,7 +757,7 @@ class NodeEditor {
             });
 
             // Clear plot data
-            this.plotPanel.clearData();
+            this.clearAllPlotData();
 
             if (result.success) {
                 this.addOutput(`✓ ${result.message}\n`);

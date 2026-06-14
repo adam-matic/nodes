@@ -224,6 +224,18 @@ applyEditorMixin(class {
             <div class="node-params">${paramText}</div>
         `;
 
+        // Plot nodes carry an embedded live chart
+        if (type === 'plot') {
+            const chartContainer = document.createElement('div');
+            chartContainer.className = 'node-inline-chart';
+            // Stop events from bubbling to the node/canvas so the chart's
+            // own mouse/wheel interactions work without triggering node drag
+            // or canvas-level zoom.
+            chartContainer.addEventListener('mousedown', e => e.stopPropagation());
+            chartContainer.addEventListener('wheel', e => e.stopPropagation(), { passive: false });
+            node.appendChild(chartContainer);
+        }
+
         // Add input ports
         const inputs = this.getNodeInputs(type, { parameters });
         inputs.forEach((input, index) => {
